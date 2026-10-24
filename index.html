@@ -115,7 +115,8 @@
         <button class="btn" id="btnHostOnline">Host a game</button>
         <button class="btn2" id="btnJoinOnline">Join a game</button>
       </div>
-      <p class="small">Online mode needs internet on both phones and loads one small library (PeerJS). If it fails, use Local mode instead.</p>
+      <button class="btn2 hidden" id="btnSwitchLocal" style="width:100%; margin-top:8px">Use Local mode instead (no server)</button>
+      <p class="small">Online mode needs internet on both phones and loads one small library (PeerJS). Keep the host's tab in the foreground — if Terry's phone locks or switches apps, the free signalling server can drop the room. If Online keeps failing, Local mode connects phone-to-phone with no server at all, and works even with no internet.</p>
     </div>
 
     <div id="localPanel" class="hidden">
@@ -501,16 +502,32 @@
   $('btnCopyAnswer').onclick = function () { copyText('answerOut'); };
 
   // ---- Online mode (PeerJS, loaded only if chosen) ----
+  // v1.2 lesson: the free PeerJS signalling server drops sockets ("Lost
+  // connection to server") and the old code turned that into one modal
+  // alert with no retry. Now: no modal alerts for connection problems,
+  // the peer reconnects to the server on disconnect, the guest retries
+  // the join 3 times, and each failure says which side actually failed
+  // (host not found vs. signalling server dropped) instead of one
+  // generic message. Local mode below needs no server at all.
+  function setOnlineStatus(text, dotClass) {
+    $('onlineStatus').textContent = text;
+    $('onlineDot').className = 'dot' + (dotClass ? ' ' + dotClass : '');
+  }
   function loadPeerJS(cb) {
     if (window.Peer) return cb();
     var s = document.createElement('script');
     s.src = 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
     s.onload = cb;
-    s.onerror = function () { alert('Could not load PeerJS (no internet?). Use Local mode instead — it needs no library.'); };
+    s.onerror = function () { setOnlineStatus('Could not load PeerJS (no internet?). Use Local mode instead — it needs no library.', 'warn'); $('btnSwitchLocal').classList.remove('hidden'); };
     document.head.appendChild(s);
   }
+  $('btnSwitchLocal').onclick = function () { setMode('local'); };
   function attachPeer(peer, onOpen) {
     peer.on('open', function () { onOpen(); });
+    peer.on('disconnected', function () {
+      setOnlineStatus('Lost connection to the signalling server — reconnecting…', 'warn');
+      try { peer.reconnect(); } catch (e) {}
+    });
     peer.on('connection', function (c) {
       conn = { send: function (m) { try { c.send(m); } catch (e) {} } };
       c.on('data', onRemote);
@@ -523,34 +540,85 @@
         refreshLocal(); broadcast();
       });
     });
-    peer.on('error', function (e) { alert('Connection error: ' + (e && e.message ? e.message : e)); });
+    peer.on('error', function (e) {
+      var t = (e && e.type) || '';
+      if (t === 'unavailable-id') setOnlineStatus('That room code is already in use in another tab. Close other Poker tabs on the host phone, or pick a new code.', 'warn');
+      else setOnlineStatus('Connection error: ' + (e && e.message ? e.message : e) + ' — tap Host again.', 'warn');
+    });
   }
   $('btnHostOnline').onclick = function () {
     var code = ($('roomCode').value.trim() || 'SPAIN').toUpperCase().replace(/[^A-Z0-9]/g, '');
-    $('onlineStatus').textContent = 'Creating room ' + code + '…';
+    $('roomCode').value = code;
+    setOnlineStatus('Creating room ' + code + '…', '');
     loadPeerJS(function () {
       var peer = new Peer('spain-poker-' + code);
-      attachPeer(peer, function () { $('onlineStatus').textContent = 'Room ' + code + ' open — waiting for the other phone to join.'; $('onlineDot').className = 'dot warn'; });
+      attachPeer(peer, function () { setOnlineStatus('Room ' + code + ' open — waiting for the other phone to join. Keep this tab in the foreground.', 'warn'); });
     });
   };
   $('btnJoinOnline').onclick = function () {
     var code = ($('roomCode').value.trim() || 'SPAIN').toUpperCase().replace(/[^A-Z0-9]/g, '');
-    $('onlineStatus').textContent = 'Joining room ' + code + '…';
+    $('roomCode').value = code;
+    $('btnSwitchLocal').classList.add('hidden');
+    setOnlineStatus('Joining room ' + code + '…', '');
     loadPeerJS(function () {
       var peer = new Peer();
-      peer.on('open', function () {
-        var c = peer.connect('spain-poker-' + code, { reliable: true });
+      var joined = false, attempt = 0, timer = null, hostNotFound = false;
+      function failFinal(reason) {
+        setOnlineStatus(reason + ' — try Local mode below, it needs no server.', 'warn');
+        $('btnSwitchLocal').classList.remove('hidden');
+      }
+      function tryConnect() {
+        if (joined) return;
+        attempt++;
+        setOnlineStatus('Joining room ' + code + '… (attempt ' + attempt + ' of 3)', '');
+        var c;
+        try { c = peer.connect('spain-poker-' + code, { reliable: true }); }
+        catch (e) { return scheduleRetry('Could not start the connection.'); }
         conn = { send: function (m) { try { c.send(m); } catch (e) {} } };
         c.on('data', onRemote);
+        timer = setTimeout(function () {
+          if (!joined) { try { c.close(); } catch (e) {} scheduleRetry('The host did not answer in time.'); }
+        }, 8000);
         c.on('open', function () {
+          joined = true; clearTimeout(timer);
           mySeat = 1; mode = 'guest';
           myName = $('myName').value.trim() || 'Chandra';
           oppName = $('oppNameInput').value.trim() || 'Terry';
           showTable(); setStatus('Connected — joined game', true);
           conn.send({ type: 'hello', name: myName });
         });
+        c.on('close', function () { if (!joined) scheduleRetry('Connection closed before the game opened.'); });
+        c.on('error', function () { if (!joined) scheduleRetry('Connection failed.'); });
+      }
+      function scheduleRetry(reason) {
+        clearTimeout(timer);
+        if (joined || hostNotFound) return;
+        if (attempt < 3) setTimeout(tryConnect, 1500);
+        else failFinal(reason);
+      }
+      peer.on('open', tryConnect);
+      peer.on('disconnected', function () {
+        if (joined) return;
+        setOnlineStatus('Lost connection to the signalling server — reconnecting and retrying…', 'warn');
+        try { peer.reconnect(); } catch (e) {}
+        setTimeout(function () { if (!joined && !hostNotFound && attempt < 3) tryConnect(); }, 2000);
       });
-      peer.on('error', function (e) { alert('Could not join. Check the room code and that the host created the room first. (' + (e && e.message ? e.message : e) + ')'); });
+      peer.on('error', function (e) {
+        if (joined) return;
+        var t = (e && e.type) || '';
+        if (t === 'peer-unavailable') {
+          // Host really is not registered (yet). Stop retrying the wrong
+          // thing and say so plainly, instead of blaming the server.
+          hostNotFound = true;
+          clearTimeout(timer);
+          setOnlineStatus('Host not found. Make sure Terry tapped Host first and saw "Room ' + code + ' open" on his phone, and both phones use exactly ' + code + '.', 'warn');
+          $('btnSwitchLocal').classList.remove('hidden');
+        } else if (t === 'disconnected' || t === 'server-error' || t === 'socket-error' || t === 'network') {
+          scheduleRetry('Lost connection to the signalling server.');
+        } else {
+          scheduleRetry('Could not join (' + (e && e.message ? e.message : e) + ').');
+        }
+      });
     });
   };
 
