@@ -1,5 +1,10 @@
 # Across the Table — heads-up Texas Hold'em for two phones
 
+Version: v1.3 — names are taken only from the phone you're holding,
+the screen stays awake while playing (toggle under the table), and
+the setup screens are shortened. The version shown at the very bottom
+of the page always matches the code served.
+
 A stylish, first-person, heads-up-only Texas Hold'em game built for Terry
 and Chandra's Spain trip: the long flight, hotel rooms, and cruise cabin.
 
