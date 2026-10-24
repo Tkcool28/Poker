@@ -98,6 +98,10 @@
     <input id="myName" type="text" value="Terry" maxlength="20">
     <label for="oppNameInput">Opponent's name</label>
     <input id="oppNameInput" type="text" value="Chandra" maxlength="20">
+    <div id="recordBox" class="small" style="margin-top:10px">
+      <span id="recordText">No saved record yet.</span>
+      <button class="btn2 hidden" id="btnResetRecord" style="margin-left:8px">Reset record</button>
+    </div>
 
     <h2 style="margin-top:18px">2 · How are you connecting?</h2>
     <div class="btn-row">
@@ -197,13 +201,13 @@
   </section>
 
   <p class="small" style="text-align:center">Blinds 10/20 · Stack 1,000 · Play chips only.</p>
-  <p id="version" class="small" style="text-align:center; margin-top:14px">Across the Table · v1.3</p>
+  <p id="version" class="small" style="text-align:center; margin-top:14px">Across the Table · v1.4</p>
 </div>
 <script src="poker.js"></script>
 <script>
 (function () {
   'use strict';
-  var APP_VERSION = 'v1.3';
+  var APP_VERSION = 'v1.4';
   var $ = function (id) { return document.getElementById(id); };
   var mode = 'solo'; // 'solo' | 'host' | 'guest'
   var game = null;   // host / solo Game instance
@@ -220,6 +224,72 @@
   function syncNames() {
     myName = $('myName').value.trim() || 'You';
     oppName = $('oppNameInput').value.trim() || 'Opponent';
+  }
+  // ---- Saved record (v1.4) ----
+  // localStorage on THIS phone, per opponent pair. Solo is recorded vs
+  // 'Bot' so solo games never pollute a record vs a real opponent, and
+  // two-phone games are recorded vs the typed opponent name. A mid-hand
+  // close loses that hand only: the record is written after every
+  // completed hand and match, and a new Game is seeded from it, so a
+  // fresh 1,000-chip match starts with the old record carried over.
+  // Stored in "my perspective" (my wins first) so the record stays right
+  // even if the same person hosts one day and guests the next — the
+  // seeder maps it back to seats. If two phones ever disagree, the
+  // host's record wins for that match and both phones save it at the
+  // end, so they re-sync. A GitHub repo cannot be this database: Pages
+  // is static, and writing to the repo from the page would need a
+  // token embedded in the page (anyone could steal it).
+  var guestRecordSynced = false;
+  function recordKey(my, opp, modeForKey) {
+    var m = (my || 'You').toLowerCase();
+    var o = modeForKey === 'solo' ? 'bot' : (opp || 'Opponent').toLowerCase();
+    return 'across-table-record:' + m + '|' + o;
+  }
+  function emptyRecord() { return { myMatches: 0, oppMatches: 0, myHands: 0, oppHands: 0, biggestPot: 0 }; }
+  function loadRecord(my, opp, modeForKey) {
+    try {
+      var r = JSON.parse(localStorage.getItem(recordKey(my, opp, modeForKey)) || 'null');
+      if (!r) return emptyRecord();
+      return {
+        myMatches: +r.myMatches || 0, oppMatches: +r.oppMatches || 0,
+        myHands: +r.myHands || 0, oppHands: +r.oppHands || 0,
+        biggestPot: +r.biggestPot || 0
+      };
+    } catch (e) { return emptyRecord(); }
+  }
+  function saveRecord(my, opp, modeForKey, v, seat) {
+    if (!v) return;
+    try {
+      localStorage.setItem(recordKey(my, opp, modeForKey), JSON.stringify({
+        myMatches: v.matchWins[seat], oppMatches: v.matchWins[1 - seat],
+        myHands: v.handsWon[seat], oppHands: v.handsWon[1 - seat],
+        biggestPot: v.biggestPot
+      }));
+    } catch (e) {}
+  }
+  function seedOptsFor(my, opp, modeForKey, seat) {
+    var r = loadRecord(my, opp, modeForKey);
+    return {
+      initialMatchWins: seat === 0 ? [r.myMatches, r.oppMatches] : [r.oppMatches, r.myMatches],
+      initialHandsWon: seat === 0 ? [r.myHands, r.oppHands] : [r.oppHands, r.myHands],
+      initialBiggestPot: r.biggestPot
+    };
+  }
+  function updateRecordBox() {
+    var box = $('recordBox'), txt = $('recordText'), btn = $('btnResetRecord');
+    if (!box || !txt || !btn) return;
+    var my = $('myName').value.trim() || 'You';
+    var opp = $('oppNameInput').value.trim() || 'Opponent';
+    var solo = mode === 'solo';
+    var r = loadRecord(my, opp, solo ? 'solo' : 'two');
+    var dispOpp = solo ? 'Bot' : opp;
+    if (r.myMatches + r.oppMatches + r.myHands + r.oppHands === 0 && r.biggestPot === 0) {
+      txt.textContent = 'No saved record vs ' + dispOpp + ' yet — your first match starts fresh.';
+      btn.classList.add('hidden');
+    } else {
+      txt.textContent = 'Saved record vs ' + dispOpp + ': ' + r.myMatches + '–' + r.oppMatches + ' matches · ' + r.myHands + '–' + r.oppHands + ' hands · Biggest pot ' + r.biggestPot + '. A new match keeps this record.';
+      btn.classList.remove('hidden');
+    }
   }
   // Keep screen awake: Wake Lock API, re-requested when the tab becomes
   // visible again (the OS releases the lock when the tab is hidden).
@@ -392,7 +462,14 @@
     renderTalk();
   }
 
-  function refreshLocal() { if (game) { view = game.view(mySeat); render(); } }
+  function refreshLocal() {
+    if (game) {
+      view = game.view(mySeat); render();
+      // Persist the record at every completed hand/match, not just at
+      // match end: a tab closed after a hand still keeps that hand.
+      if (view.phase === 'handEnd' || view.phase === 'matchEnd') saveRecord(myName, oppName, mode === 'solo' ? 'solo' : 'two', view, mySeat);
+    }
+  }
   function broadcast() {
     if (conn && mode === 'host' && game) conn.send({ type: 'state', view: game.view(1), hostName: myName });
   }
@@ -440,7 +517,15 @@
   }
   function onRemote(msg) {
     if (!msg) return;
-    if (msg.type === 'state') { view = msg.view; render(); }
+    if (msg.type === 'state') {
+      view = msg.view; render();
+      if (mode === 'guest') {
+        // First state: adopt the host's record, so a guest who later
+        // hosts starts from the shared record, not a stale one.
+        if (!guestRecordSynced) { saveRecord(myName, oppName, 'two', view, mySeat); guestRecordSynced = true; }
+        else if (view.phase === 'handEnd' || view.phase === 'matchEnd') saveRecord(myName, oppName, 'two', view, mySeat);
+      }
+    }
     else if (msg.type === 'action' && mode === 'host' && game) {
       var r = game.act(1, msg.action);
       if (r.ok) { refreshLocal(); broadcast(); }
@@ -466,7 +551,19 @@
       : m === 'online'
       ? 'Same room code on both phones. Both need internet.'
       : 'Same hotspot or Wi-Fi on both phones. No internet needed.';
+    updateRecordBox();
   }
+  $('myName').oninput = updateRecordBox;
+  $('oppNameInput').oninput = updateRecordBox;
+  $('btnResetRecord').onclick = function () {
+    var my = $('myName').value.trim() || 'You';
+    var opp = $('oppNameInput').value.trim() || 'Opponent';
+    var solo = mode === 'solo';
+    var dispOpp = solo ? 'Bot' : opp;
+    if (!confirm('Clear the saved record vs ' + dispOpp + '? This cannot be undone.')) return;
+    try { localStorage.removeItem(recordKey(my, opp, solo ? 'solo' : 'two')); } catch (e) {}
+    updateRecordBox();
+  };
   $('btnSolo').onclick = function () { setMode('solo'); };
   $('btnOnline').onclick = function () { setMode('online'); };
   $('btnLocal').onclick = function () { setMode('local'); };
@@ -476,7 +573,7 @@
     myName = $('myName').value.trim() || 'You';
     oppName = $('oppNameInput').value.trim() || 'Opponent';
     mode = 'solo'; mySeat = 0;
-    game = new Poker.Game({});
+    game = new Poker.Game(seedOptsFor(myName, oppName, 'solo', 0));
     showTable(); setStatus('Solo vs Bot', false); refreshLocal(); scheduleBot();
   };
 
@@ -575,7 +672,7 @@
       c.on('data', onRemote);
       c.on('open', function () {
         mySeat = 0; mode = 'host';
-        if (!game) game = new Poker.Game({});
+        if (!game) game = new Poker.Game(seedOptsFor($('myName').value.trim() || 'You', $('oppNameInput').value.trim() || 'Opponent', 'two', 0));
         myName = $('myName').value.trim() || 'You';
         showTable(); setStatus('Connected — you host', true);
         conn.send({ type: 'hello', name: myName });
@@ -623,6 +720,7 @@
         }, 8000);
         c.on('open', function () {
           joined = true; clearTimeout(timer);
+          guestRecordSynced = false;
           mySeat = 1; mode = 'guest';
           myName = $('myName').value.trim() || 'Opponent';
           oppName = $('oppNameInput').value.trim() || 'You';
@@ -683,7 +781,7 @@
     attachLocalChannel(channel);
     channel.onopen = function () {
       mySeat = 0; mode = 'host';
-      if (!game) game = new Poker.Game({});
+      if (!game) game = new Poker.Game(seedOptsFor($('myName').value.trim() || 'You', $('oppNameInput').value.trim() || 'Opponent', 'two', 0));
       showTable(); setStatus('Connected locally — you host', true);
       conn.send({ type: 'hello', name: myName });
       refreshLocal(); broadcast();
@@ -702,6 +800,7 @@
     localPC.ondatachannel = function (e) {
       attachLocalChannel(e.channel);
       e.channel.onopen = function () {
+        guestRecordSynced = false;
         mySeat = 1; mode = 'guest';
         showTable(); setStatus('Connected locally — joined game', true);
         conn.send({ type: 'hello', name: myName });
