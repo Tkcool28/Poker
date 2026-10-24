@@ -74,6 +74,20 @@ function seededRand(seed) { let s = seed; return () => { s = (s * 1103515245 + 1
   ok(P.compareScore(s0, s1) > 0, 'flush on board beats pair of aces');
 }
 
+// Seeded record (v1.4): a new Game starts with the saved record, and
+// rematch() preserves it while resetting only stacks/button/hand number.
+{
+  const g = new P.Game({ rand: seededRand(5), initialMatchWins: [2, 1], initialHandsWon: [5, 3], initialBiggestPot: 400 });
+  let v = g.view(0);
+  ok(v.matchWins[0] === 2 && v.matchWins[1] === 1, 'seeded match wins shown');
+  ok(v.handsWon[0] === 5 && v.handsWon[1] === 3, 'seeded hands won shown');
+  ok(v.biggestPot === 400, 'seeded biggest pot shown');
+  g.rematch();
+  v = g.view(0);
+  ok(v.matchWins[0] === 2 && v.handsWon[0] === 5 && v.biggestPot === 400, 'rematch preserves record');
+  ok(v.stacks[0] === 990 && v.stacks[1] === 980 && v.handNumber === 1, 'rematch resets stacks (minus blinds) and hand number');
+}
+
 // Bot never returns an illegal action.
 {
   for (let i = 0; i < 200; i++) {
