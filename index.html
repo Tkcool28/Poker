@@ -84,7 +84,7 @@
 <body>
 <div id="app">
   <h1>Across the <span>Table</span></h1>
-  <p class="sub">Heads-up Texas Hold'em, first person. You sit here. Your opponent sits across. No casino, no real money, no account — just the two of you and a trip scoreboard.</p>
+  <p class="sub">Heads-up Texas Hold'em, first person.</p>
 
   <div id="score" class="hidden">
     <span><span id="scoreMe">You</span>: <b id="scoreMeVal">0</b> matches</span>
@@ -96,7 +96,7 @@
     <h2>1 · Who's playing?</h2>
     <label for="myName">Your name</label>
     <input id="myName" type="text" value="Terry" maxlength="20">
-    <label for="oppNameInput">Opponent's name (for solo / before they join)</label>
+    <label for="oppNameInput">Opponent's name</label>
     <input id="oppNameInput" type="text" value="Chandra" maxlength="20">
 
     <h2 style="margin-top:18px">2 · How are you connecting?</h2>
@@ -105,7 +105,7 @@
       <button class="btn2" id="btnOnline">Online (PeerJS)</button>
       <button class="btn2" id="btnLocal">Local / No internet</button>
     </div>
-    <p class="small" id="modeHelp">Solo is instant — practice the view and the buttons before Chandra joins. Blinds 10/20, stacks 1,000 (50 big blinds).</p>
+    <p class="small" id="modeHelp">Blinds 10/20 · Stacks 1,000.</p>
 
     <div id="onlinePanel" class="hidden">
       <p><span class="status"><span class="dot" id="onlineDot"></span><span id="onlineStatus">Not connected</span></span></p>
@@ -116,31 +116,27 @@
         <button class="btn2" id="btnJoinOnline">Join a game</button>
       </div>
       <button class="btn2 hidden" id="btnSwitchLocal" style="width:100%; margin-top:8px">Use Local mode instead (no server)</button>
-      <p class="small">Online mode needs internet on both phones and loads one small library (PeerJS). Keep the host's tab in the foreground — if Terry's phone locks or switches apps, the free signalling server can drop the room. If Online keeps failing, Local mode connects phone-to-phone with no server at all, and works even with no internet.</p>
+      <p class="small">Both phones need internet for this mode.</p>
     </div>
 
     <div id="localPanel" class="hidden">
       <p><span class="status"><span class="dot" id="localDot"></span><span id="localStatus">Not connected</span></span></p>
-      <p><b>Host (one phone):</b> tap Create offer, copy the code, send it to the other phone any way you like — text, a note, read it out loud. It works over a hotspot with no internet at all, as long as both phones are on the same hotspot/Wi-Fi.</p>
+      <p class="small">Both phones on the same hotspot or Wi-Fi. No internet needed after this page is loaded.</p>
       <div class="btn-row"><button class="btn" id="btnCreateOffer">Create offer code</button><button class="btn2" id="btnCopyOffer">Copy offer</button></div>
       <label for="offerOut">Offer code (host → guest)</label>
       <textarea id="offerOut" readonly placeholder="Your offer code appears here"></textarea>
-      <p><b>Guest (other phone):</b> paste the host's offer below, tap Create answer, send the answer code back to the host.</p>
       <label for="offerIn">Paste host's offer code here</label>
       <textarea id="offerIn" placeholder="Paste offer code"></textarea>
       <div class="btn-row"><button class="btn" id="btnCreateAnswer">Create answer code</button><button class="btn2" id="btnCopyAnswer">Copy answer</button></div>
       <label for="answerOut">Answer code (guest → host)</label>
       <textarea id="answerOut" readonly placeholder="Your answer code appears here"></textarea>
-      <p><b>Host, last step:</b> paste the guest's answer code below and tap Finish connecting.</p>
       <label for="answerIn">Paste guest's answer code here</label>
       <textarea id="answerIn" placeholder="Paste answer code"></textarea>
       <div class="btn-row"><button class="btn" id="btnFinishLocal">Finish connecting</button></div>
-      <p class="small"><b>Offline tip:</b> load this page while you still have internet, then leave the tab open. On the plane, one phone turns on its hotspot, the other joins it, and Local mode connects over that hotspot — no internet needed after the page is loaded.</p>
     </div>
 
     <div style="margin-top:16px">
       <button class="btn" id="btnStartSolo" style="width:100%">Start solo game</button>
-      <p class="small" style="text-align:center">Solo starts immediately. Online / Local games start automatically once the other phone connects.</p>
     </div>
   </section>
 
@@ -168,7 +164,7 @@
       <div class="stack"><span id="meStack">1000</span> chips</div>
       <div class="small" id="meBet"></div>
       <div style="margin-top:8px">
-        <label class="peek" style="display:inline"><input type="checkbox" id="keepFaceUp" checked> Keep my cards face-up (turn off if you're sitting side by side, then hold Peek)</label>
+        <label class="peek" style="display:inline"><input type="checkbox" id="keepFaceUp" checked> Keep my cards face-up</label>
       </div>
       <button class="btn2 peek" id="peekBtn" style="margin-top:8px; width:100%">Hold to peek at my cards</button>
     </div>
@@ -195,25 +191,59 @@
       <button data-taunt="Your move…">Your move…</button>
       <button data-taunt="All in? Brave.">All in? Brave.</button>
     </div>
-    <div class="talklog" id="talkLog"><span class="small">Table talk shows here — tap a comment above and it stays here, even after the next hand.</span></div>
+    <div class="talklog" id="talkLog"><span class="small">Table talk</span></div>
     <p class="small" style="text-align:center; margin-top:10px"><span class="status"><span class="dot" id="connDot"></span><span id="connStatus">Solo game</span></span></p>
+    <button class="btn2 hidden" id="wakeBtn" style="width:100%; margin-top:8px">Keep screen awake: On</button>
   </section>
 
-  <p class="small" style="text-align:center">Play chips only. Blinds 10/20 · Starting stack 1,000 · Button posts the small blind and acts first preflop, second after the flop — the standard heads-up rule. In a two-phone game the host's phone deals the cards, so it technically knows both hands: perfect for bragging rights, never for money. Full rules, offline steps and the trust note are in the README in the repo.</p>
+  <p class="small" style="text-align:center">Blinds 10/20 · Stack 1,000 · Play chips only.</p>
+  <p id="version" class="small" style="text-align:center; margin-top:14px">Across the Table · v1.3</p>
 </div>
 <script src="poker.js"></script>
 <script>
 (function () {
   'use strict';
+  var APP_VERSION = 'v1.3';
   var $ = function (id) { return document.getElementById(id); };
   var mode = 'solo'; // 'solo' | 'host' | 'guest'
   var game = null;   // host / solo Game instance
   var view = null;   // last rendered view (guest: received; host/solo: game.view)
   var mySeat = 0;
-  var myName = 'Terry', oppName = 'Chandra';
+  var myName = 'You', oppName = 'Opponent';
   var conn = null;   // {send: fn} for host/guest, null for solo
   var peeking = false;
   var botTimer = null;
+  // Names: each phone shows ONLY what was typed on that phone. The old
+  // code let the other phone's hello/state overwrite these, which is why
+  // the play screen kept reverting to the defaults. Remote names are
+  // now ignored for display; syncNames() is the single source of truth.
+  function syncNames() {
+    myName = $('myName').value.trim() || 'You';
+    oppName = $('oppNameInput').value.trim() || 'Opponent';
+  }
+  // Keep screen awake: Wake Lock API, re-requested when the tab becomes
+  // visible again (the OS releases the lock when the tab is hidden).
+  var wakeLock = null, wakeOn = true;
+  function updateWakeBtn() {
+    var b = $('wakeBtn');
+    if (!b) return;
+    if (!('wakeLock' in navigator)) { b.classList.add('hidden'); return; }
+    b.classList.remove('hidden');
+    b.textContent = 'Keep screen awake: ' + (wakeOn && wakeLock ? 'On' : 'Off');
+  }
+  function requestWakeLock() {
+    if (!wakeOn || !('wakeLock' in navigator)) { updateWakeBtn(); return; }
+    try {
+      navigator.wakeLock.request('screen').then(function (lock) {
+        wakeLock = lock;
+        lock.addEventListener('release', function () { wakeLock = null; updateWakeBtn(); });
+        updateWakeBtn();
+      }).catch(function () { wakeLock = null; updateWakeBtn(); });
+    } catch (e) { wakeLock = null; updateWakeBtn(); }
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') requestWakeLock();
+  });
 
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function suitColor(c) { return (c.indexOf('♥') !== -1 || c.indexOf('♦') !== -1) ? 'red' : ''; }
@@ -229,12 +259,17 @@
     $('connDot').className = 'dot' + (on ? ' on' : '');
   }
   function showTable() {
+    syncNames();
     $('setup').classList.add('hidden');
     $('table').classList.remove('hidden');
     $('score').classList.remove('hidden');
     $('scoreMe').textContent = myName;
     $('scoreOpp').textContent = oppName;
+    requestWakeLock();
   }
+  // Version is set from one constant, so the footer always matches the
+  // code actually served — that is the whole point of the version line.
+  if ($('version')) $('version').textContent = 'Across the Table · ' + APP_VERSION;
   function banner(html) {
     var b = $('banner');
     if (!html) { b.classList.add('hidden'); b.innerHTML = ''; return; }
@@ -405,7 +440,7 @@
   }
   function onRemote(msg) {
     if (!msg) return;
-    if (msg.type === 'state') { view = msg.view; if (msg.hostName) oppName = msg.hostName; render(); }
+    if (msg.type === 'state') { view = msg.view; render(); }
     else if (msg.type === 'action' && mode === 'host' && game) {
       var r = game.act(1, msg.action);
       if (r.ok) { refreshLocal(); broadcast(); }
@@ -414,7 +449,7 @@
       if (view.phase === 'matchEnd') game.rematch(); else game.nextHand();
       refreshLocal(); broadcast();
     }
-    else if (msg.type === 'hello' && msg.name) { oppName = msg.name; render(); }
+    else if (msg.type === 'hello' && msg.name) { /* Remote name ignored on purpose: this phone shows only what was typed on this phone (see syncNames). */ render(); }
     else if (msg.type === 'taunt' && msg.text) {
       addTalk(oppName, msg.text);
     }
@@ -427,10 +462,10 @@
     $('localPanel').classList.toggle('hidden', m !== 'local');
     $('btnStartSolo').classList.toggle('hidden', m !== 'solo');
     $('modeHelp').textContent = m === 'solo'
-      ? 'Solo is instant — practice the view and the buttons before Chandra joins. Blinds 10/20, stacks 1,000 (50 big blinds).'
+      ? 'Blinds 10/20 · Stacks 1,000.'
       : m === 'online'
-      ? 'Online: one phone hosts, the other joins with the same room code. Both need internet for this mode.'
-      : 'Local: no internet needed after this page is loaded. One phone hotspots, the other joins it, then exchange the offer/answer codes below.';
+      ? 'Same room code on both phones. Both need internet.'
+      : 'Same hotspot or Wi-Fi on both phones. No internet needed.';
   }
   $('btnSolo').onclick = function () { setMode('solo'); };
   $('btnOnline').onclick = function () { setMode('online'); };
@@ -438,8 +473,8 @@
   setMode('solo');
 
   $('btnStartSolo').onclick = function () {
-    myName = $('myName').value.trim() || 'Terry';
-    oppName = $('oppNameInput').value.trim() || 'Chandra';
+    myName = $('myName').value.trim() || 'You';
+    oppName = $('oppNameInput').value.trim() || 'Opponent';
     mode = 'solo'; mySeat = 0;
     game = new Poker.Game({});
     showTable(); setStatus('Solo vs Bot', false); refreshLocal(); scheduleBot();
@@ -473,6 +508,13 @@
   };
   $('btnNext').onclick = doNext;
   $('keepFaceUp').onchange = render;
+  $('wakeBtn').onclick = function () {
+    wakeOn = !wakeOn;
+    if (!wakeOn && wakeLock) { try { wakeLock.release(); } catch (e) {} wakeLock = null; }
+    else if (wakeOn) requestWakeLock();
+    updateWakeBtn();
+  };
+  updateWakeBtn();
   var peek = $('peekBtn');
   peek.addEventListener('pointerdown', function (e) { e.preventDefault(); peeking = true; render(); });
   ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) {
@@ -534,7 +576,7 @@
       c.on('open', function () {
         mySeat = 0; mode = 'host';
         if (!game) game = new Poker.Game({});
-        myName = $('myName').value.trim() || 'Terry';
+        myName = $('myName').value.trim() || 'You';
         showTable(); setStatus('Connected — you host', true);
         conn.send({ type: 'hello', name: myName });
         refreshLocal(); broadcast();
@@ -582,8 +624,8 @@
         c.on('open', function () {
           joined = true; clearTimeout(timer);
           mySeat = 1; mode = 'guest';
-          myName = $('myName').value.trim() || 'Chandra';
-          oppName = $('oppNameInput').value.trim() || 'Terry';
+          myName = $('myName').value.trim() || 'Opponent';
+          oppName = $('oppNameInput').value.trim() || 'You';
           showTable(); setStatus('Connected — joined game', true);
           conn.send({ type: 'hello', name: myName });
         });
@@ -611,7 +653,7 @@
           // thing and say so plainly, instead of blaming the server.
           hostNotFound = true;
           clearTimeout(timer);
-          setOnlineStatus('Host not found. Make sure Terry tapped Host first and saw "Room ' + code + ' open" on his phone, and both phones use exactly ' + code + '.', 'warn');
+          setOnlineStatus('Host not found. Make sure the host tapped Host first and saw "Room ' + code + ' open" on his phone, and both phones use exactly ' + code + '.', 'warn');
           $('btnSwitchLocal').classList.remove('hidden');
         } else if (t === 'disconnected' || t === 'server-error' || t === 'socket-error' || t === 'network') {
           scheduleRetry('Lost connection to the signalling server.');
@@ -635,7 +677,7 @@
     channel.onmessage = function (e) { try { onRemote(JSON.parse(e.data)); } catch (err) {} };
   }
   $('btnCreateOffer').onclick = function () {
-    myName = $('myName').value.trim() || 'Terry';
+    myName = $('myName').value.trim() || 'You';
     localPC = new RTCPeerConnection({ iceServers: [] }); // local candidates only: no internet needed
     var channel = localPC.createDataChannel('game');
     attachLocalChannel(channel);
@@ -653,7 +695,7 @@
     }).catch(function (e) { alert('Could not create offer: ' + e.message); });
   };
   $('btnCreateAnswer').onclick = function () {
-    myName = $('myName').value.trim() || 'Chandra';
+    myName = $('myName').value.trim() || 'Opponent';
     var offer;
     try { offer = JSON.parse(atob($('offerIn').value.trim())); } catch (e) { alert('That offer code does not look right — paste the full code from the host.'); return; }
     localPC = new RTCPeerConnection({ iceServers: [] });
