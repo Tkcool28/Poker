@@ -18,6 +18,9 @@ and Chandra's Spain trip: the long flight, hotel rooms, and cruise cabin.
   each phone's browser storage, so it survives closing the tab.
 - Solo mode vs a simple bot, for practice and for testing the view
   before the other phone joins.
+- Table talk: the comment buttons under the table (Nice hand, Bluffing?,
+  etc.) post to a persistent log that survives the next hand, on both
+  phones in a 2-phone game. In solo mode the bot talks back.
 
 ## How to play (2 phones)
 
