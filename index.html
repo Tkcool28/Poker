@@ -108,6 +108,7 @@
       <button class="btn" id="btnSolo">Solo vs Bot</button>
       <button class="btn2" id="btnOnline">Online (PeerJS)</button>
       <button class="btn2" id="btnLocal">Local / No internet</button>
+      <button class="btn2" id="btnPass">Pass &amp; play (1 phone)</button>
     </div>
     <p class="small" id="modeHelp">Blinds 10/20 · Stacks 1,000.</p>
 
@@ -143,6 +144,12 @@
       <button class="btn" id="btnStartSolo" style="width:100%">Start solo game</button>
     </div>
   </section>
+
+  <div id="passCover" class="hidden" style="position:fixed; inset:0; z-index:50; background:#0b1220; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:24px; text-align:center">
+    <div style="font-size:22px; font-weight:700" id="passCoverText">Pass the phone</div>
+    <p class="small" style="max-width:300px">Your cards are hidden. Hand the phone to the player above — nobody else should look.</p>
+    <button class="btn" id="btnPassReady" style="min-width:220px">I'm ready — show my cards</button>
+  </div>
 
   <section id="table" class="hidden">
     <div class="opp" id="oppBox">
@@ -201,19 +208,35 @@
   </section>
 
   <p class="small" style="text-align:center">Blinds 10/20 · Stack 1,000 · Play chips only.</p>
-  <p id="version" class="small" style="text-align:center; margin-top:14px">Across the Table · v1.4</p>
+  <p id="version" class="small" style="text-align:center; margin-top:14px">Across the Table · v1.5</p>
 </div>
 <script src="poker.js"></script>
 <script>
 (function () {
   'use strict';
-  var APP_VERSION = 'v1.4';
+  var APP_VERSION = 'v1.5';
   var $ = function (id) { return document.getElementById(id); };
-  var mode = 'solo'; // 'solo' | 'host' | 'guest'
-  var game = null;   // host / solo Game instance
-  var view = null;   // last rendered view (guest: received; host/solo: game.view)
+  var mode = 'solo'; // 'solo' | 'host' | 'guest' | 'pass'
+  var game = null;   // host / solo / pass Game instance
+  var view = null;   // last rendered view (guest: received; host/solo/pass: game.view)
   var mySeat = 0;
   var myName = 'You', oppName = 'Opponent';
+  // Pass-and-play (v1.5): one phone, two humans. Seat 0/1 names are
+  // fixed at game start (they are NOT myName/oppName, which in other
+  // modes mean viewer/other). The viewer (mySeat) switches to whoever
+  // is to act, behind a full-screen cover, so the other player's cards
+  // are never on screen while the phone changes hands.
+  var passSeat0 = 'You', passSeat1 = 'Opponent', passCoverTarget = null;
+  function dispMeName() { return mode === 'pass' ? (mySeat === 0 ? passSeat0 : passSeat1) : myName; }
+  function dispOppName() { return mode === 'pass' ? (mySeat === 0 ? passSeat1 : passSeat0) : oppName; }
+  function showPassCover(seat) {
+    passCoverTarget = seat;
+    var name = seat === 0 ? passSeat0 : passSeat1;
+    $('passCoverText').textContent = 'Pass the phone to ' + name;
+    $('btnPassReady').textContent = "I'm " + name + ' — show my cards';
+    $('passCover').classList.remove('hidden');
+  }
+  function hidePassCover() { $('passCover').classList.add('hidden'); passCoverTarget = null; }
   var conn = null;   // {send: fn} for host/guest, null for solo
   var peeking = false;
   var botTimer = null;
@@ -348,7 +371,7 @@
   function lastActionText(v) {
     if (!v || !v.lastAction) return '';
     var a = v.lastAction;
-    var who = a.seat === mySeat ? myName : oppName;
+    var who = mode === 'pass' ? (a.seat === 0 ? passSeat0 : passSeat1) : (a.seat === mySeat ? myName : oppName);
     if (a.type === 'fold') return who + ' folded';
     if (a.type === 'check') return who + ' checked';
     if (a.type === 'call') return who + ' called ' + a.amount;
@@ -360,9 +383,11 @@
   function render() {
     if (!view) return;
     var oppSeat = 1 - mySeat;
-    $('oppName').textContent = oppName;
-    $('meName').textContent = myName;
-    $('oppAvatar').textContent = (oppName || '?').charAt(0).toUpperCase();
+    $('oppName').textContent = dispOppName();
+    $('meName').textContent = dispMeName();
+    $('oppAvatar').textContent = (dispOppName() || '?').charAt(0).toUpperCase();
+    $('scoreMe').textContent = dispMeName();
+    $('scoreOpp').textContent = dispOppName();
     $('oppStack').textContent = view.stacks[oppSeat];
     $('meStack').textContent = view.stacks[mySeat];
     $('potAmt').textContent = view.pot;
@@ -394,7 +419,7 @@
     $('myCards').innerHTML = view.myCards.map(function (c) { return faceUp ? cardHtml(c, 'my') : cardHtml(null, 'my'); }).join('');
     $('peekBtn').classList.toggle('hidden', $('keepFaceUp').checked);
 
-    $('toCallLine').textContent = view.myTurn ? 'Your turn' : (view.phase === 'handEnd' || view.phase === 'matchEnd' ? '' : oppName + ' is thinking…');
+    $('toCallLine').textContent = view.myTurn ? 'Your turn' : (view.phase === 'handEnd' || view.phase === 'matchEnd' ? '' : dispOppName() + ' is thinking…');
     $('meBox').classList.toggle('turn-glow', !!view.myTurn);
     $('oppBox').classList.toggle('turn-glow', !view.myTurn && view.phase !== 'handEnd' && view.phase !== 'matchEnd');
 
@@ -428,13 +453,13 @@
     var next = $('btnNext');
     if (view.phase === 'matchEnd') {
       var mw = (view.matchWinner !== null && view.matchWinner !== undefined) ? view.matchWinner : view.winner;
-      banner('🏆 Match over — ' + (mw === mySeat ? myName : oppName) + ' takes the match! <small>Tap Rematch for a fresh 1,000 each.</small>');
+      banner('🏆 Match over — ' + (mw === mySeat ? dispMeName() : dispOppName()) + ' takes the match! <small>Tap Rematch for a fresh 1,000 each.</small>');
       next.textContent = 'Rematch'; next.disabled = false;
     } else if (view.phase === 'handEnd') {
       var msg;
-      if (view.winningReason === 'fold') msg = (view.winner === mySeat ? myName : oppName) + ' wins ' + view.winningPot + ' — opponent folded.';
+      if (view.winningReason === 'fold') msg = (view.winner === mySeat ? dispMeName() : dispOppName()) + ' wins ' + view.winningPot + ' — opponent folded.';
       else if (view.winner === null) msg = 'Split pot, ' + view.winningPot + ' each way.';
-      else msg = (view.winner === mySeat ? myName : oppName) + ' wins ' + view.winningPot + ' with ' + (view.showdown ? view.showdown.names[view.winner] : '') + '.';
+      else msg = (view.winner === mySeat ? dispMeName() : dispOppName()) + ' wins ' + view.winningPot + ' with ' + (view.showdown ? view.showdown.names[view.winner] : '') + '.';
       banner(msg);
       next.textContent = 'Next hand'; next.disabled = false;
     } else {
@@ -463,11 +488,24 @@
   }
 
   function refreshLocal() {
-    if (game) {
-      view = game.view(mySeat); render();
-      // Persist the record at every completed hand/match, not just at
-      // match end: a tab closed after a hand still keeps that hand.
-      if (view.phase === 'handEnd' || view.phase === 'matchEnd') saveRecord(myName, oppName, mode === 'solo' ? 'solo' : 'two', view, mySeat);
+    if (!game) return;
+    view = game.view(mySeat);
+    if (mode === 'pass' && view.phase !== 'handEnd' && view.phase !== 'matchEnd' && game.turn !== mySeat) {
+      // Pass-and-play: the phone now belongs to the other player.
+      // Do NOT render the new view yet — the cover hides the old one,
+      // and the new player's cards appear only after they tap Ready.
+      showPassCover(game.turn);
+      return;
+    }
+    render();
+    // Persist the record at every completed hand/match, not just at
+    // match end: a tab closed after a hand still keeps that hand.
+    // Pass mode saves from seat 0's perspective with fixed seat names,
+    // because the viewer (and myName/oppName as viewer/other) swaps
+    // every turn — saving by viewer would split one record into two.
+    if (view.phase === 'handEnd' || view.phase === 'matchEnd') {
+      if (mode === 'pass') saveRecord(passSeat0, passSeat1, 'two', view, 0);
+      else saveRecord(myName, oppName, mode === 'solo' ? 'solo' : 'two', view, mySeat);
     }
   }
   function broadcast() {
@@ -484,6 +522,10 @@
       var r2 = game.act(0, action);
       if (!r2.ok) { alert(r2.error); return; }
       refreshLocal(); broadcast();
+    } else if (mode === 'pass') {
+      var r3 = game.act(mySeat, action);
+      if (!r3.ok) { alert(r3.error); return; }
+      refreshLocal();
     } else if (mode === 'guest') {
       conn.send({ type: 'action', action: action });
       // Wait for the host's state; the buttons stay live but the host
@@ -504,7 +546,7 @@
     }, 750);
   }
   function doNext() {
-    if (mode === 'solo' || mode === 'host') {
+    if (mode === 'solo' || mode === 'host' || mode === 'pass') {
       var r;
       if (view.phase === 'matchEnd') r = game.rematch();
       else r = game.nextHand();
@@ -545,9 +587,12 @@
     mode = m;
     $('onlinePanel').classList.toggle('hidden', m !== 'online');
     $('localPanel').classList.toggle('hidden', m !== 'local');
-    $('btnStartSolo').classList.toggle('hidden', m !== 'solo');
+    $('btnStartSolo').classList.toggle('hidden', m !== 'solo' && m !== 'pass');
+    $('btnStartSolo').textContent = m === 'pass' ? 'Start pass-and-play game' : 'Start solo game';
     $('modeHelp').textContent = m === 'solo'
       ? 'Blinds 10/20 · Stacks 1,000.'
+      : m === 'pass'
+      ? 'One phone, passed back and forth. No network, no Wi-Fi, no Bluetooth — works with every radio off.'
       : m === 'online'
       ? 'Same room code on both phones. Both need internet.'
       : 'Same hotspot or Wi-Fi on both phones. No internet needed.';
@@ -567,14 +612,31 @@
   $('btnSolo').onclick = function () { setMode('solo'); };
   $('btnOnline').onclick = function () { setMode('online'); };
   $('btnLocal').onclick = function () { setMode('local'); };
+  $('btnPass').onclick = function () { setMode('pass'); };
   setMode('solo');
 
   $('btnStartSolo').onclick = function () {
     myName = $('myName').value.trim() || 'You';
     oppName = $('oppNameInput').value.trim() || 'Opponent';
+    if (mode === 'pass') {
+      // Pass-and-play: seat 0 is the first name typed, seat 1 the
+      // second. The record key is seat0|seat1 (same as the two-phone
+      // record for this pair), seeded from seat 0's perspective.
+      passSeat0 = myName; passSeat1 = oppName;
+      mySeat = 0;
+      game = new Poker.Game(seedOptsFor(passSeat0, passSeat1, 'two', 0));
+      showTable(); setStatus('Pass & play — 1 phone', false); refreshLocal();
+      return;
+    }
     mode = 'solo'; mySeat = 0;
     game = new Poker.Game(seedOptsFor(myName, oppName, 'solo', 0));
     showTable(); setStatus('Solo vs Bot', false); refreshLocal(); scheduleBot();
+  };
+  $('btnPassReady').onclick = function () {
+    if (passCoverTarget === null) return;
+    mySeat = passCoverTarget;
+    hidePassCover();
+    refreshLocal();
   };
 
   // ---- Actions ----
@@ -622,7 +684,7 @@
       var text = b.getAttribute('data-taunt');
       // Always show your own comment locally first — the old code only
       // sent it to the other phone, so on your own phone nothing happened.
-      addTalk(myName, text);
+      addTalk(dispMeName(), text);
       if (conn) conn.send({ type: 'taunt', text: text });
       else if (mode === 'solo') {
         // Solo: the bot talks back, so the buttons feel alive in practice too.
