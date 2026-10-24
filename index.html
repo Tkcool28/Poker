@@ -73,6 +73,8 @@
   #raiseAmt { font-size:20px; font-weight:800; color:var(--gold); text-align:center; }
   .taunts { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
   .taunts button { flex:1; padding:9px 6px; font-size:13px; background:#243140; color:#fff; border:1px solid #3a4a5c; }
+  .talklog { margin-top:10px; background:rgba(0,0,0,.28); border-radius:12px; padding:10px 12px; font-size:14px; line-height:1.55; min-height:44px; }
+  .talklog b { color:var(--gold); }
   .hidden { display:none !important; }
   .turn-glow { outline:3px solid var(--gold); outline-offset:3px; border-radius:14px; }
   .peek { font-size:14px; }
@@ -192,6 +194,7 @@
       <button data-taunt="Your move…">Your move…</button>
       <button data-taunt="All in? Brave.">All in? Brave.</button>
     </div>
+    <div class="talklog" id="talkLog"><span class="small">Table talk shows here — tap a comment above and it stays here, even after the next hand.</span></div>
     <p class="small" style="text-align:center; margin-top:10px"><span class="status"><span class="dot" id="connDot"></span><span id="connStatus">Solo game</span></span></p>
   </section>
 
@@ -215,8 +218,10 @@
   function suitColor(c) { return (c.indexOf('♥') !== -1 || c.indexOf('♦') !== -1) ? 'red' : ''; }
   function cardHtml(label, cls) {
     if (!label) return '<div class="pcard back ' + (cls || '') + '">♠</div>';
+    // Internal rank 'T' is a ten. A real card never says "T", so display 10.
     var rank = label.slice(0, -1), suit = label.slice(-1);
-    return '<div class="pcard ' + suitColor(label) + ' ' + (cls || '') + '"><span class="rank">' + esc(rank) + '</span><span class="suit">' + esc(suit) + '</span><span class="big">' + esc(suit) + '</span></div>';
+    var disp = rank === 'T' ? '10' : rank;
+    return '<div class="pcard ' + suitColor(label) + ' ' + (cls || '') + '"><span class="rank">' + esc(disp) + '</span><span class="suit">' + esc(suit) + '</span><span class="big">' + esc(suit) + '</span></div>';
   }
   function setStatus(text, on) {
     $('connStatus').textContent = text;
@@ -330,6 +335,25 @@
       banner(null); next.disabled = true;
     }
     if (mode === 'guest') next.disabled = (view.phase !== 'handEnd' && view.phase !== 'matchEnd');
+    renderTalk();
+  }
+  // Table talk: a persistent log, NOT the opponent bubble. The old code
+  // wrote taunts into the opponent bubble, and the next render() overwrote
+  // them with the last action — which is why the comment buttons looked
+  // like they did nothing. This log survives renders.
+  var talk = [];
+  function renderTalk() {
+    var el = $('talkLog');
+    if (!el) return;
+    if (!talk.length) return; // keep the placeholder until the first comment
+    el.innerHTML = talk.map(function (t) {
+      return '<div><b>' + esc(t.who) + ':</b> ' + esc(t.text) + '</div>';
+    }).join('');
+  }
+  function addTalk(who, text) {
+    talk.push({ who: who, text: text });
+    while (talk.length > 4) talk.shift();
+    renderTalk();
   }
 
   function refreshLocal() { if (game) { view = game.view(mySeat); render(); } }
@@ -391,8 +415,7 @@
     }
     else if (msg.type === 'hello' && msg.name) { oppName = msg.name; render(); }
     else if (msg.type === 'taunt' && msg.text) {
-      $('oppBubble').textContent = msg.text;
-      setTimeout(function () { render(); }, 4000);
+      addTalk(oppName, msg.text);
     }
   }
 
@@ -457,8 +480,17 @@
   document.querySelectorAll('#tauntRow button').forEach(function (b) {
     b.onclick = function () {
       var text = b.getAttribute('data-taunt');
+      // Always show your own comment locally first — the old code only
+      // sent it to the other phone, so on your own phone nothing happened.
+      addTalk(myName, text);
       if (conn) conn.send({ type: 'taunt', text: text });
-      else $('oppBubble').textContent = '(Solo: taunts only work in a 2-phone game.)';
+      else if (mode === 'solo') {
+        // Solo: the bot talks back, so the buttons feel alive in practice too.
+        var replies = ["Ha, we'll see.", 'Nice try.', 'I saw that coming.', 'Your move, champ.'];
+        setTimeout(function () {
+          addTalk(oppName, replies[Math.floor(Math.random() * replies.length)]);
+        }, 900);
+      }
     };
   });
   function copyText(id) {
