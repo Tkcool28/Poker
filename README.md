@@ -26,10 +26,21 @@ and Chandra's Spain trip: the long flight, hotel rooms, and cruise cabin.
 
 ### Online (hotel Wi-Fi, or anywhere with internet)
 
-1. Both phones open the live site.
+1. Both phones open the live site. Close other Poker tabs first — a
+   second Host tab can steal the room code.
 2. Both tap **Online**, type the *same* room code (e.g. `SPAIN`).
-3. One phone taps **Host a game**, the other taps **Join a game**.
+3. One phone taps **Host a game** and waits until it says
+   **Room SPAIN open**. Only then does the other phone tap
+   **Join a game**.
 4. Play. The host's phone deals and is the authority on the game state.
+
+If Join says **Host not found**, the host really isn't registered yet
+— re-tap Host and wait for the "open" status. If it says the
+signalling server dropped, the game retries the join 3 times on its
+own; if it still fails, tap **Use Local mode instead** — that mode
+needs no server at all and is the reliable choice when you're in the
+same room. Connection problems now show as text on the page, never as
+a modal popup.
 
 ### Local / no internet (plane, cruise cabin)
 
