@@ -129,11 +129,15 @@
     this.smallBlind = opts.smallBlind || 10;
     this.bigBlind = opts.bigBlind || 20;
     this.stacks = [this.stackSize, this.stackSize];
-    this.matchWins = [0, 0];
-    this.handsPlayed = [0, 0]; // hands won, per player
+    // Seeded record (v1.4): a new match can start with a saved record
+    // instead of 0-0. The caller (index.html) maps its perspective record
+    // to seats; the engine just honours what it is given, and rematch()
+    // deliberately preserves these so a record accumulates across matches.
+    this.matchWins = (opts.initialMatchWins || [0, 0]).slice();
+    this.handsPlayed = (opts.initialHandsWon || [0, 0]).slice(); // hands won, per player
     this.button = 0;
     this.handNumber = 0;
-    this.biggestPot = 0;
+    this.biggestPot = opts.initialBiggestPot || 0;
     this.rand = opts.rand || Math.random;
     this.newHand();
   }
