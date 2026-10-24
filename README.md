@@ -1,11 +1,12 @@
 # Across the Table — heads-up Texas Hold'em for two phones
 
-Version: v1.4 — the record now saves. Matches won, hands won, and
-biggest pot are stored on each phone (localStorage, per opponent —
-solo games are recorded vs Bot so they never pollute a record vs a
-real opponent), written after every completed hand and match, and a
-new match starts with that record carried over. The setup screen shows
-the saved record for the names typed, with a Reset button. The version
+Version: v1.5 — pass-and-play. One phone, passed back and forth:
+after every action the screen is covered with "Pass the phone to
+[Name]" and the next player's cards appear only after they tap "I'm
+ready". No network, no Wi-Fi, no Bluetooth, no hotspot — it works
+with every radio off, which makes it the plane-proof mode when a
+hotspot is blocked in airplane mode. The pass-and-play record is the
+same saved record as the two-phone game for that pair. The version
 shown at the very bottom of the page always matches the code served.
 
 A stylish, first-person, heads-up-only Texas Hold'em game built for Terry
@@ -34,6 +35,11 @@ and Chandra's Spain trip: the long flight, hotel rooms, and cruise cabin.
   at a time.
 - Solo mode vs a simple bot, for practice and for testing the view
   before the other phone joins.
+- Pass-and-play mode (v1.5): one phone for two humans. Tap
+  **Pass & play (1 phone)**, type both names, start. After each
+  action the phone is covered until the next player taps Ready, so
+  cards are never on screen while the phone changes hands. A mid-hand
+  close loses only that hand; the saved record (v1.4) still applies.
 - Table talk: the comment buttons under the table (Nice hand, Bluffing?,
   etc.) post to a persistent log that survives the next hand, on both
   phones in a 2-phone game. In solo mode the bot talks back.
