@@ -1,9 +1,12 @@
 # Across the Table — heads-up Texas Hold'em for two phones
 
-Version: v1.3 — names are taken only from the phone you're holding,
-the screen stays awake while playing (toggle under the table), and
-the setup screens are shortened. The version shown at the very bottom
-of the page always matches the code served.
+Version: v1.4 — the record now saves. Matches won, hands won, and
+biggest pot are stored on each phone (localStorage, per opponent —
+solo games are recorded vs Bot so they never pollute a record vs a
+real opponent), written after every completed hand and match, and a
+new match starts with that record carried over. The setup screen shows
+the saved record for the names typed, with a Reset button. The version
+shown at the very bottom of the page always matches the code served.
 
 A stylish, first-person, heads-up-only Texas Hold'em game built for Terry
 and Chandra's Spain trip: the long flight, hotel rooms, and cruise cabin.
@@ -19,8 +22,16 @@ and Chandra's Spain trip: the long flight, hotel rooms, and cruise cabin.
 - Blinds 10/20, starting stack 1,000 (50 big blinds). The button posts
   the small blind and acts first preflop, second after the flop — the
   standard heads-up rule.
-- Trip scoreboard: matches won, hands won, biggest pot. It lives in
-  each phone's browser storage, so it survives closing the tab.
+- Trip scoreboard: matches won, hands won, biggest pot. Since v1.4
+  it is saved on each phone (localStorage, per opponent), so it
+  survives closing the tab and a new match starts with the old record.
+  A mid-hand close loses only that hand, not the record. If two phones
+  ever disagree, the host's record wins for that match and both phones
+  save it at the end, so they re-sync.
+- Multiple games at once: fine. Each host phone is its own game and
+  the site itself holds no shared state — two pairs just need
+  different room codes, since one code can only be claimed by one host
+  at a time.
 - Solo mode vs a simple bot, for practice and for testing the view
   before the other phone joins.
 - Table talk: the comment buttons under the table (Nice hand, Bluffing?,
@@ -68,8 +79,8 @@ This is the mode that matters for the trip, so read it before you fly:
 
 If the connection drops mid-hand, rejoin with the same room code
 (Online) or redo the offer/answer exchange (Local). Hands are not
-saved mid-hand in v1 — the scoreboard only counts finished matches
-and hands, so a dropped connection costs at most the hand in progress.
+saved mid-hand — the saved record only counts finished hands and
+matches, so a dropped connection costs at most the hand in progress.
 
 ### Your cards, when you're sitting together
 
@@ -97,8 +108,9 @@ trusted server dealing — a different project entirely.
   PeerJS). No build step, no framework.
 - `poker.js` — the pure game engine: deck, hand evaluator, betting,
   showdown, and the solo bot. Runs in a browser and under Node.
-- `test.js` — engine tests. Run with `node test.js` (235 checks,
-  including 200 bot games that must only ever make legal moves).
+- `test.js` — engine tests. Run with `node test.js` (240 checks,
+  including 200 bot games that must only ever make legal moves, plus
+  seeded-record and rematch-preserves-record checks).
 
 ## Enabling GitHub Pages (one time, Terry)
 
