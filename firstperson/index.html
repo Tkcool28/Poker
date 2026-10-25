@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Across the Table — Heads-Up Hold'em</title>
+<meta name="description" content="A stylish first-person heads-up Texas Hold'em game for two phones. No server, no account, no casino.">
+<style>
+  :root { --gold:#e8c46a; --felt:#0d5c3f; --felt2:#084a32; --bg:#0a0f14; --card-w:64px; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; padding:0; background:var(--bg); color:#f2ede3; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  body { min-height:100dvh; }
+  #app { max-width:520px; margin:0 auto; padding:14px 12px 28px; }
+  h1 { font-size:26px; margin:6px 0 2px; letter-spacing:.3px; }
+  h1 span { color:var(--gold); }
+  .sub { color:#b9b2a4; font-size:14px; margin:0 0 14px; line-height:1.45; }
+  .card-panel { background:#141b22; border:1px solid #2a3644; border-radius:16px; padding:14px; margin-bottom:12px; }
+  .card-panel h2 { font-size:16px; margin:0 0 8px; }
+  .card-panel p, .card-panel li { font-size:14px; color:#cfc8b9; line-height:1.5; }
+  label { display:block; font-size:13px; color:#b9b2a4; margin:10px 0 4px; }
+  input[type=text], textarea { width:100%; background:#0d141b; color:#fff; border:1px solid #33404e; border-radius:10px; padding:11px 12px; font-size:16px; }
+  textarea { min-height:84px; font-size:12px; font-family:ui-monospace,Menlo,monospace; }
+  button { cursor:pointer; border:0; border-radius:12px; padding:13px 14px; font-size:16px; font-weight:650; }
+  .btn { background:var(--gold); color:#1a1206; }
+  .btn2 { background:#243140; color:#fff; border:1px solid #3a4a5c; }
+  .btn-danger { background:#7a2e2e; color:#fff; }
+  .btn-row { display:flex; gap:8px; flex-wrap:wrap; }
+  .btn-row button { flex:1; }
+  .small { font-size:13px; color:#9aa5b1; line-height:1.5; }
+  .status { display:inline-flex; align-items:center; gap:6px; font-size:13px; padding:5px 10px; border-radius:99px; background:#1c2836; }
+  .dot { width:9px; height:9px; border-radius:50%; background:#888; }
+  .dot.on { background:#3ddc84; } .dot.warn { background:#e8c46a; }
+  #score { display:flex; justify-content:space-between; gap:8px; font-size:14px; background:#141b22; border:1px solid #2a3644; border-radius:12px; padding:10px 12px; margin-bottom:10px; }
+  #score b { color:var(--gold); }
+  /* ---- The table: first person, opponent across, you in the foreground ---- */
+  #table { position:relative; border-radius:22px; padding:12px 10px 16px; overflow:hidden; display:flex; flex-direction:column; justify-content:space-between; min-height:640px;
+    background:radial-gradient(ellipse 120% 90% at 50% 0%, #155f42 0%, var(--felt) 45%, var(--felt2) 100%);
+    border:1px solid #2f6b4f; box-shadow:0 20px 50px rgba(0,0,0,.55), inset 0 0 0 6px rgba(232,196,106,.12); }
+  #table::before { content:""; position:absolute; inset:0; background:radial-gradient(ellipse at 50% 115%, rgba(0,0,0,.55), transparent 60%); pointer-events:none; }
+  /* ---- First-person variant (poker-fp only): the felt is a trapezoid,
+     narrow at the far end, wide at your end — like looking down the
+     table at the photos, not down from above. Opponent is smaller and
+     further away, your cards are big, fanned, and held low. ---- */
+  #table::after { content:""; position:absolute; inset:0; pointer-events:none; z-index:0;
+    background:linear-gradient(180deg, rgba(0,0,0,.45) 0%, rgba(0,0,0,0) 22%, rgba(0,0,0,0) 70%, rgba(0,0,0,.5) 100%);
+    clip-path:polygon(16% 0, 84% 0, 100% 100%, 0 100%); }
+  #table > * { position:relative; z-index:1; }
+  body.playing h1, body.playing .sub { display:none; }
+  body.playing #app { padding:6px 8px 16px; }
+  .opp { transform:scale(.86); transform-origin:top center; }
+  .board .cards { transform:perspective(600px) rotateX(28deg); transform-origin:center top; }
+  .me { margin-top:18px; }
+  .me .cards { gap:0; transform:perspective(500px) rotateX(-8deg); }
+  .me .cards .pcard.my:first-child { margin-right:-20px; transform:rotate(-10deg) translateY(6px); }
+  .me .cards .pcard.my:last-child { transform:rotate(10deg) translateY(6px); }
+  .pcard.my { width:96px; height:134px; }
+  .pcard.my .rank { font-size:30px; }
+  .pcard.my .big { font-size:60px; }
+  /* Chip stacks: a pile that visibly grows and shrinks with the amount. */
+  .chipstack { display:flex; flex-direction:column-reverse; align-items:center; min-height:14px; margin:6px 0; }
+  .chip { width:56px; height:11px; border-radius:6px; border:2px dashed rgba(255,255,255,.75); box-shadow:0 1px 3px rgba(0,0,0,.5); margin-top:-5px; }
+  .chip:first-child { margin-top:0; }
+  .potstack .chip { width:64px; }
+  .chip-fly { position:absolute; z-index:10; width:44px; height:22px; border-radius:11px; border:2px dashed rgba(255,255,255,.85); box-shadow:0 4px 10px rgba(0,0,0,.6); transition:transform .55s ease-in, opacity .55s; pointer-events:none; }
+  .opp { text-align:center; position:relative; }
+  .opp .avatar { width:58px; height:58px; margin:0 auto 4px; border-radius:50%; background:#1c2836; border:2px solid var(--gold); display:flex; align-items:center; justify-content:center; font-size:26px; }
+  .opp .name, .me .name { font-weight:700; }
+  .opp .stack, .me .stack { color:var(--gold); font-weight:700; }
+  .bubble { display:inline-block; background:#fff; color:#111; border-radius:14px; padding:5px 11px; font-size:13px; font-weight:650; margin:6px 0; min-height:20px; }
+  .bubble:empty { display:none; }
+  .board { text-align:center; margin:10px 0 6px; position:relative; }
+  .pot { font-size:18px; font-weight:800; color:#fff; text-shadow:0 2px 8px rgba(0,0,0,.6); }
+  .pot small { display:block; font-size:12px; color:#d8cfae; font-weight:500; letter-spacing:1px; text-transform:uppercase; }
+  .cards { display:flex; gap:6px; justify-content:center; margin:8px 0; }
+  .pcard { width:var(--card-w); height:88px; background:#fdfbf5; color:#111; border-radius:10px; position:relative; box-shadow:0 6px 16px rgba(0,0,0,.45); flex-shrink:0; }
+  .pcard.red { color:#b4232a; }
+  .pcard .rank { position:absolute; top:6px; left:8px; font-weight:800; font-size:20px; line-height:1; }
+  .pcard .suit { position:absolute; top:26px; left:8px; font-size:14px; }
+  .pcard .big { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:38px; }
+  .pcard.small { width:44px; height:62px; }
+  .pcard.small .rank { font-size:15px; top:4px; left:5px; }
+  .pcard.small .suit { font-size:11px; top:19px; left:5px; }
+  .pcard.small .big { font-size:26px; }
+  .pcard.my { width:82px; height:116px; }
+  .pcard.my .rank { font-size:26px; top:7px; left:9px; }
+  .pcard.my .suit { font-size:17px; top:33px; left:9px; }
+  .pcard.my .big { font-size:52px; }
+  .pcard.back { background:repeating-linear-gradient(45deg,#7a1f2b 0 10px,#5c1620 10px 20px); border:3px solid #f2ede3; display:flex; align-items:center; justify-content:center; color:var(--gold); font-size:28px; }
+  .pcard.back.small { font-size:20px; }
+  .me { text-align:center; margin-top:10px; position:relative; }
+  .dealer { display:inline-block; background:#fff; color:#111; font-weight:800; font-size:12px; border-radius:50%; width:22px; height:22px; line-height:22px; margin-left:6px; vertical-align:middle; }
+  .banner { background:#fff8e1; color:#1a1206; border-radius:12px; padding:11px 12px; font-weight:700; text-align:center; margin:10px 0; line-height:1.4; }
+  .banner small { display:block; font-weight:500; color:#5a4a22; }
+  #actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; }
+  #actions button:disabled { opacity:.35; cursor:default; }
+  #raiseBox { grid-column:1 / -1; background:rgba(0,0,0,.28); border-radius:12px; padding:10px; }
+  #raiseBox input[type=range] { width:100%; accent-color:var(--gold); }
+  #raiseAmt { font-size:20px; font-weight:800; color:var(--gold); text-align:center; }
+  .taunts { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+  .taunts button { flex:1; padding:9px 6px; font-size:13px; background:#243140; color:#fff; border:1px solid #3a4a5c; }
+  .talklog { margin-top:10px; background:rgba(0,0,0,.28); border-radius:12px; padding:10px 12px; font-size:14px; line-height:1.55; min-height:44px; }
+  .talklog b { color:var(--gold); }
+  .hidden { display:none !important; }
+  .turn-glow { outline:3px solid var(--gold); outline-offset:3px; border-radius:14px; }
+  .peek { font-size:14px; }
+  @media (max-width:380px) { :root { --card-w:56px; } .pcard.my { width:74px; height:104px; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>Across the <span>Table</span></h1>
+  <p class="sub">Heads-up Texas Hold'em, first person.</p>
+
+  <div id="score" class="hidden">
+    <span><span id="scoreMe">You</span>: <b id="scoreMeVal">0</b> matches</span>
+    <span>Hands <b id="handsVal">0–0</b> · Biggest pot <b id="potVal">0</b></span>
+    <span><span id="scoreOpp">Opponent</span>: <b id="scoreOppVal">0</b> matches</span>
+  </div>
+
+  <section id="setup" class="card-panel">
+    <h2>1 · Who's playing?</h2>
+    <label for="myName">Your name</label>
+    <input id="myName" type="text" value="Terry" maxlength="20">
+    <label for="oppNameInput">Opponent's name</label>
+    <input id="oppNameInput" type="text" value="Chandra" maxlength="20">
+    <div id="recordBox" class="small" style="margin-top:10px">
+      <span id="recordText">No saved record yet.</span>
+      <button class="btn2 hidden" id="btnResetRecord" style="margin-left:8px">Reset record</button>
+    </div>
+
+    <h2 style="margin-top:18px">2 · How are you connecting?</h2>
+    <div class="btn-row">
+      <button class="btn" id="btnSolo">Solo vs Bot</button>
+      <button class="btn2" id="btnOnline">Online (PeerJS)</button>
+      <button class="btn2" id="btnLocal">Local / No internet</button>
+      <button class="btn2" id="btnPass">Pass &amp; play (1 phone)</button>
+    </div>
+    <p class="small" id="modeHelp">Blinds 10/20 · Stacks 1,000.</p>
+
+    <div id="onlinePanel" class="hidden">
+      <p><span class="status"><span class="dot" id="onlineDot"></span><span id="onlineStatus">Not connected</span></span></p>
+      <label for="roomCode">Room code — both phones use the same code (letters only)</label>
+      <input id="roomCode" type="text" value="SPAIN" maxlength="12">
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn" id="btnHostOnline">Host a game</button>
+        <button class="btn2" id="btnJoinOnline">Join a game</button>
+      </div>
+      <button class="btn2 hidden" id="btnSwitchLocal" style="width:100%; margin-top:8px">Use Local mode instead (no server)</button>
+      <p class="small">Both phones need internet for this mode.</p>
+    </div>
+
+    <div id="localPanel" class="hidden">
+      <p><span class="status"><span class="dot" id="localDot"></span><span id="localStatus">Not connected</span></span></p>
+      <p class="small">Both phones on the same hotspot or Wi-Fi. No internet needed after this page is loaded.</p>
+      <div class="btn-row"><button class="btn" id="btnCreateOffer">Create offer code</button><button class="btn2" id="btnCopyOffer">Copy offer</button></div>
+      <label for="offerOut">Offer code (host → guest)</label>
+      <textarea id="offerOut" readonly placeholder="Your offer code appears here"></textarea>
+      <label for="offerIn">Paste host's offer code here</label>
+      <textarea id="offerIn" placeholder="Paste offer code"></textarea>
+      <div class="btn-row"><button class="btn" id="btnCreateAnswer">Create answer code</button><button class="btn2" id="btnCopyAnswer">Copy answer</button></div>
+      <label for="answerOut">Answer code (guest → host)</label>
+      <textarea id="answerOut" readonly placeholder="Your answer code appears here"></textarea>
+      <label for="answerIn">Paste guest's answer code here</label>
+      <textarea id="answerIn" placeholder="Paste answer code"></textarea>
+      <div class="btn-row"><button class="btn" id="btnFinishLocal">Finish connecting</button></div>
+    </div>
+
+    <div style="margin-top:16px">
+      <button class="btn" id="btnStartSolo" style="width:100%">Start solo game</button>
+    </div>
+  </section>
+
+  <div id="passCover" class="hidden" style="position:fixed; inset:0; z-index:50; background:#0b1220; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:24px; text-align:center">
+    <div style="font-size:22px; font-weight:700" id="passCoverText">Pass the phone</div>
+    <p class="small" style="max-width:300px">Your cards are hidden. Hand the phone to the player above — nobody else should look.</p>
+    <button class="btn" id="btnPassReady" style="min-width:220px">I'm ready — show my cards</button>
+  </div>
+
+  <section id="table" class="hidden">
+    <div class="opp" id="oppBox">
+      <div class="avatar" id="oppAvatar">♠</div>
+      <div><span class="name" id="oppName">Opponent</span><span id="oppDealer" class="dealer hidden">D</span></div>
+      <div class="stack"><span id="oppStack">1000</span> chips</div>
+      <div class="chipstack" id="oppChips"></div>
+      <div class="bubble" id="oppBubble"></div>
+      <div class="cards" id="oppCards"></div>
+      <div class="small" id="oppBet"></div>
+    </div>
+
+    <div class="board">
+      <div class="chipstack potstack" id="potChips"></div>
+      <div class="pot"><span id="potAmt">0</span><small id="streetLabel">Preflop · Hand 1</small></div>
+      <div class="cards" id="boardCards"></div>
+      <div class="small" id="toCallLine"></div>
+    </div>
+
+    <div id="banner" class="banner hidden"></div>
+
+    <div class="me" id="meBox">
+      <div class="cards" id="myCards"></div>
+      <div><span class="name" id="meName">You</span><span id="meDealer" class="dealer hidden">D</span></div>
+      <div class="stack"><span id="meStack">1000</span> chips</div>
+      <div class="chipstack" id="meChips"></div>
+      <div class="small" id="meBet"></div>
+      <div style="margin-top:8px">
+        <label class="peek" style="display:inline"><input type="checkbox" id="keepFaceUp" checked> Keep my cards face-up</label>
+      </div>
+      <button class="btn2 peek" id="peekBtn" style="margin-top:8px; width:100%">Hold to peek at my cards</button>
+    </div>
+
+    <div id="actions">
+      <button class="btn-danger" id="btnFold">Fold</button>
+      <button class="btn2" id="btnCheckCall">Check</button>
+      <div id="raiseBox">
+        <div id="raiseAmt">—</div>
+        <input type="range" id="raiseSlider" min="0" max="100" value="0" step="10">
+        <div class="btn-row" style="margin-top:8px">
+          <button class="btn2" id="btnHalfPot">½ pot</button>
+          <button class="btn2" id="btnPot">Pot</button>
+          <button class="btn2" id="btnAllIn">All-in</button>
+        </div>
+        <button class="btn" id="btnRaise" style="width:100%; margin-top:8px">Raise to …</button>
+      </div>
+      <button class="btn" id="btnNext" style="grid-column:1 / -1" disabled>Next hand</button>
+    </div>
+
+    <div class="taunts" id="tauntRow">
+      <button data-taunt="Nice hand.">Nice hand.</button>
+      <button data-taunt="Bluffing?">Bluffing?</button>
+      <button data-taunt="Your move…">Your move…</button>
+      <button data-taunt="All in? Brave.">All in? Brave.</button>
+    </div>
+    <div class="talklog" id="talkLog"><span class="small">Table talk</span></div>
+    <p class="small" style="text-align:center; margin-top:10px"><span class="status"><span class="dot" id="connDot"></span><span id="connStatus">Solo game</span></span></p>
+    <button class="btn2 hidden" id="wakeBtn" style="width:100%; margin-top:8px">Keep screen awake: On</button>
+  </section>
+
+  <p class="small" style="text-align:center">Blinds 10/20 · Stack 1,000 · Play chips only.</p>
+  <p id="version" class="small" style="text-align:center; margin-top:14px">Across the Table · v1.5-fp (first-person test)</p>
+</div>
+<script src="poker.js"></script>
+<script>
+(function () {
+  'use strict';
+  var APP_VERSION = 'v1.5-fp';
+  var $ = function (id) { return document.getElementById(id); };
+  var mode = 'solo'; // 'solo' | 'host' | 'guest' | 'pass'
+  var game = null;   // host / solo / pass Game instance
+  var view = null;   // last rendered view (guest: received; host/solo/pass: game.view)
+  var mySeat = 0;
+  var myName = 'You', oppName = 'Opponent';
+  // Pass-and-play (v1.5): one phone, two humans. Seat 0/1 names are
+  // fixed at game start (they are NOT myName/oppName, which in other
+  // modes mean viewer/other). The viewer (mySeat) switches to whoever
+  // is to act, behind a full-screen cover, so the other player's cards
+  // are never on screen while the phone changes hands.
+  var passSeat0 = 'You', passSeat1 = 'Opponent', passCoverTarget = null;
+  function dispMeName() { return mode === 'pass' ? (mySeat === 0 ? passSeat0 : passSeat1) : myName; }
+  function dispOppName() { return mode === 'pass' ? (mySeat === 0 ? passSeat1 : passSeat0) : oppName; }
+  function showPassCover(seat) {
+    passCoverTarget = seat;
+    var name = seat === 0 ? passSeat0 : passSeat1;
+    $('passCoverText').textContent = 'Pass the phone to ' + name;
+    $('btnPassReady').textContent = "I'm " + name + ' — show my cards';
+    $('passCover').classList.remove('hidden');
+  }
+  function hidePassCover() { $('passCover').classList.add('hidden'); passCoverTarget = null; }
+  var conn = null;   // {send: fn} for host/guest, null for solo
+  var peeking = false;
+  var botTimer = null;
+  // Names: each phone shows ONLY what was typed on that phone. The old
+  // code let the other phone's hello/state overwrite these, which is why
+  // the play screen kept reverting to the defaults. Remote names are
+  // now ignored for display; syncNames() is the single source of truth.
+  function syncNames() {
+    myName = $('myName').value.trim() || 'You';
+    oppName = $('oppNameInput').value.trim() || 'Opponent';
+  }
+  // ---- Saved record (v1.4) ----
+  // localStorage on THIS phone, per opponent pair. Solo is recorded vs
+  // 'Bot' so solo games never pollute a record vs a real opponent, and
+  // two-phone games are recorded vs the typed opponent name. A mid-hand
+  // close loses that hand only: the record is written after every
+  // completed hand and match, and a new Game is seeded from it, so a
+  // fresh 1,000-chip match starts with the old record carried over.
+  // Stored in "my perspective" (my wins first) so the record stays right
+  // even if the same person hosts one day and guests the next — the
+  // seeder maps it back to seats. If two phones ever disagree, the
+  // host's record wins for that match and both phones save it at the
+  // end, so they re-sync. A GitHub repo cannot be this database: Pages
+  // is static, and writing to the repo from the page would need a
+  // token embedded in the page (anyone could steal it).
+  var guestRecordSynced = false;
+  function recordKey(my, opp, modeForKey) {
+    var m = (my || 'You').toLowerCase();
+    var o = modeForKey === 'solo' ? 'bot' : (opp || 'Opponent').toLowerCase();
+    return 'across-table-record:' + m + '|' + o;
+  }
+  function emptyRecord() { return { myMatches: 0, oppMatches: 0, myHands: 0, oppHands: 0, biggestPot: 0 }; }
+  function loadRecord(my, opp, modeForKey) {
+    try {
+      var r = JSON.parse(localStorage.getItem(recordKey(my, opp, modeForKey)) || 'null');
+      if (!r) return emptyRecord();
+      return {
+        myMatches: +r.myMatches || 0, oppMatches: +r.oppMatches || 0,
+        myHands: +r.myHands || 0, oppHands: +r.oppHands || 0,
+        biggestPot: +r.biggestPot || 0
+      };
+    } catch (e) { return emptyRecord(); }
+  }
+  function saveRecord(my, opp, modeForKey, v, seat) {
+    if (!v) return;
+    try {
+      localStorage.setItem(recordKey(my, opp, modeForKey), JSON.stringify({
+        myMatches: v.matchWins[seat], oppMatches: v.matchWins[1 - seat],
+        myHands: v.handsWon[seat], oppHands: v.handsWon[1 - seat],
+        biggestPot: v.biggestPot
+      }));
+    } catch (e) {}
+  }
+  function seedOptsFor(my, opp, modeForKey, seat) {
+    var r = loadRecord(my, opp, modeForKey);
+    return {
+      initialMatchWins: seat === 0 ? [r.myMatches, r.oppMatches] : [r.oppMatches, r.myMatches],
+      initialHandsWon: seat === 0 ? [r.myHands, r.oppHands] : [r.oppHands, r.myHands],
+      initialBiggestPot: r.biggestPot
+    };
+  }
+  function updateRecordBox() {
+    var box = $('recordBox'), txt = $('recordText'), btn = $('btnResetRecord');
+    if (!box || !txt || !btn) return;
+    var my = $('myName').value.trim() || 'You';
+    var opp = $('oppNameInput').value.trim() || 'Opponent';
+    var solo = mode === 'solo';
+    var r = loadRecord(my, opp, solo ? 'solo' : 'two');
+    var dispOpp = solo ? 'Bot' : opp;
+    if (r.myMatches + r.oppMatches + r.myHands + r.oppHands === 0 && r.biggestPot === 0) {
+      txt.textContent = 'No saved record vs ' + dispOpp + ' yet — your first match starts fresh.';
+      btn.classList.add('hidden');
+    } else {
+      txt.textContent = 'Saved record vs ' + dispOpp + ': ' + r.myMatches + '–' + r.oppMatches + ' matches · ' + r.myHands + '–' + r.oppHands + ' hands · Biggest pot ' + r.biggestPot + '. A new match keeps this record.';
+      btn.classList.remove('hidden');
+    }
+  }
+  // Keep screen awake: Wake Lock API, re-requested when the tab becomes
+  // visible again (the OS releases the lock when the tab is hidden).
+  var wakeLock = null, wakeOn = true;
+  function updateWakeBtn() {
+    var b = $('wakeBtn');
+    if (!b) return;
+    if (!('wakeLock' in navigator)) { b.classList.add('hidden'); return; }
+    b.classList.remove('hidden');
+    b.textContent = 'Keep screen awake: ' + (wakeOn && wakeLock ? 'On' : 'Off');
+  }
+  function requestWakeLock() {
+    if (!wakeOn || !('wakeLock' in navigator)) { updateWakeBtn(); return; }
+    try {
+      navigator.wakeLock.request('screen').then(function (lock) {
+        wakeLock = lock;
+        lock.addEventListener('release', function () { wakeLock = null; updateWakeBtn(); });
+        updateWakeBtn();
+      }).catch(function () { wakeLock = null; updateWakeBtn(); });
+    } catch (e) { wakeLock = null; updateWakeBtn(); }
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') requestWakeLock();
+  });
+
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function suitColor(c) { return (c.indexOf('♥') !== -1 || c.indexOf('♦') !== -1) ? 'red' : ''; }
+  function cardHtml(label, cls) {
+    if (!label) return '<div class="pcard back ' + (cls || '') + '">♠</div>';
+    // Internal rank 'T' is a ten. A real card never says "T", so display 10.
+    var rank = label.slice(0, -1), suit = label.slice(-1);
+    var disp = rank === 'T' ? '10' : rank;
+    return '<div class="pcard ' + suitColor(label) + ' ' + (cls || '') + '"><span class="rank">' + esc(disp) + '</span><span class="suit">' + esc(suit) + '</span><span class="big">' + esc(suit) + '</span></div>';
+  }
+  function setStatus(text, on) {
+    $('connStatus').textContent = text;
+    $('connDot').className = 'dot' + (on ? ' on' : '');
+  }
+  // First-person chip stacks + motion (fp only; engine untouched).
+  var CHIP_COLORS = ['#b4232a', '#f2ede3', '#2456a6', '#1a1a1a', '#e8c46a'];
+  function renderChips(elId, amount, perChip) {
+    var el = $(elId); if (!el) return;
+    var n = amount <= 0 ? 0 : Math.max(1, Math.min(14, Math.ceil(amount / perChip)));
+    var html = '';
+    for (var i = 0; i < n; i++) html += '<div class="chip" style="background:' + CHIP_COLORS[i % CHIP_COLORS.length] + '"></div>';
+    el.innerHTML = html;
+  }
+  var prevPot = null, prevFlyKey = null;
+  function flyChip(fromId, toId, color) {
+    var from = $(fromId), to = $(toId), table = $('table');
+    if (!from || !to || !table) return;
+    var fr = from.getBoundingClientRect(), tr = to.getBoundingClientRect(), br = table.getBoundingClientRect();
+    var chip = document.createElement('div');
+    chip.className = 'chip-fly';
+    chip.style.background = color || '#b4232a';
+    chip.style.left = (fr.left - br.left + fr.width / 2 - 22) + 'px';
+    chip.style.top = (fr.top - br.top) + 'px';
+    table.appendChild(chip);
+    requestAnimationFrame(function () {
+      chip.style.transform = 'translate(' + (tr.left - fr.left) + 'px,' + (tr.top - fr.top) + 'px) rotate(180deg)';
+      chip.style.opacity = '0.2';
+    });
+    setTimeout(function () { if (chip.parentNode) chip.parentNode.removeChild(chip); }, 650);
+  }
+  function showTable() {
+    syncNames();
+    document.body.classList.add('playing');
+    $('setup').classList.add('hidden');
+    $('table').classList.remove('hidden');
+    $('score').classList.remove('hidden');
+    $('scoreMe').textContent = myName;
+    $('scoreOpp').textContent = oppName;
+    requestWakeLock();
+  }
+  // Version is set from one constant, so the footer always matches the
+  // code actually served — that is the whole point of the version line.
+  if ($('version')) $('version').textContent = 'Across the Table · ' + APP_VERSION;
+  function banner(html) {
+    var b = $('banner');
+    if (!html) { b.classList.add('hidden'); b.innerHTML = ''; return; }
+    b.innerHTML = html; b.classList.remove('hidden');
+  }
+  function lastActionText(v) {
+    if (!v || !v.lastAction) return '';
+    var a = v.lastAction;
+    var who = mode === 'pass' ? (a.seat === 0 ? passSeat0 : passSeat1) : (a.seat === mySeat ? myName : oppName);
+    if (a.type === 'fold') return who + ' folded';
+    if (a.type === 'check') return who + ' checked';
+    if (a.type === 'call') return who + ' called ' + a.amount;
+    if (a.type === 'all-in') return who + ' is ALL-IN';
+    if (a.type === 'raise') return who + ' raised to ' + a.amount;
+    return '';
+  }
+
+  function render() {
+    if (!view) return;
+    var oppSeat = 1 - mySeat;
+    $('oppName').textContent = dispOppName();
+    $('meName').textContent = dispMeName();
+    $('oppAvatar').textContent = (dispOppName() || '?').charAt(0).toUpperCase();
+    $('scoreMe').textContent = dispMeName();
+    $('scoreOpp').textContent = dispOppName();
+    $('oppStack').textContent = view.stacks[oppSeat];
+    $('meStack').textContent = view.stacks[mySeat];
+    $('potAmt').textContent = view.pot;
+    $('streetLabel').textContent = ({
+      preflop: 'Preflop', flop: 'Flop', turn: 'Turn', river: 'River',
+      showdown: 'Showdown', handEnd: 'Hand over', matchEnd: 'Match over'
+    })[view.phase] + ' · Hand ' + view.handNumber + ' · Blinds 10/20';
+    $('oppDealer').classList.toggle('hidden', view.button !== oppSeat);
+    $('meDealer').classList.toggle('hidden', view.button !== mySeat);
+    $('oppBet').textContent = view.contributed[oppSeat] ? 'Bet this street: ' + view.contributed[oppSeat] : '';
+    $('meBet').textContent = view.contributed[mySeat] ? 'Bet this street: ' + view.contributed[mySeat] : '';
+    $('oppBubble').textContent = lastActionText(view);
+    $('scoreMeVal').textContent = view.matchWins[mySeat];
+    $('scoreOppVal').textContent = view.matchWins[oppSeat];
+    $('handsVal').textContent = view.handsWon[mySeat] + '–' + view.handsWon[oppSeat];
+    $('potVal').textContent = view.biggestPot;
+    // Chip stacks grow/shrink with the real amounts; a chip flies
+    // whenever the pot grows (a bet/call) or is paid out at hand end.
+    // Keyed so a re-render of the same state (peek toggle, etc.)
+    // does not replay the motion.
+    var flyKey = view.phase + '|' + view.handNumber + '|' + view.pot + '|' + view.winner;
+    if (flyKey !== prevFlyKey) {
+      if (prevPot !== null && view.pot > prevPot && view.lastAction) {
+        var actorSeat = view.lastAction.seat;
+        flyChip(actorSeat === mySeat ? 'meChips' : 'oppChips', 'potChips');
+      } else if ((view.phase === 'handEnd' || view.phase === 'matchEnd') && view.winner !== null && view.winningPot) {
+        flyChip('potChips', view.winner === mySeat ? 'meChips' : 'oppChips', '#e8c46a');
+      }
+      prevFlyKey = flyKey;
+    }
+    prevPot = view.pot;
+    renderChips('oppChips', view.stacks[oppSeat], 80);
+    renderChips('meChips', view.stacks[mySeat], 80);
+    renderChips('potChips', view.pot, 40);
+
+    // Opponent cards: backs unless showdown revealed them.
+    $('oppCards').innerHTML = view.oppCards.map(function (c) { return cardHtml(c, 'small'); }).join('');
+    // Board: always face-up, pad with backs for undealt streets so the
+    // layout does not jump around.
+    var board = view.community.slice();
+    while (board.length < 5) board.push(null);
+    $('boardCards').innerHTML = board.map(function (c) { return cardHtml(c); }).join('');
+
+    // My cards: face-up by default; if the player turned that off, backs
+    // unless they are holding Peek.
+    var faceUp = $('keepFaceUp').checked || peeking;
+    $('myCards').innerHTML = view.myCards.map(function (c) { return faceUp ? cardHtml(c, 'my') : cardHtml(null, 'my'); }).join('');
+    $('peekBtn').classList.toggle('hidden', $('keepFaceUp').checked);
+
+    $('toCallLine').textContent = view.myTurn ? 'Your turn' : (view.phase === 'handEnd' || view.phase === 'matchEnd' ? '' : dispOppName() + ' is thinking…');
+    $('meBox').classList.toggle('turn-glow', !!view.myTurn);
+    $('oppBox').classList.toggle('turn-glow', !view.myTurn && view.phase !== 'handEnd' && view.phase !== 'matchEnd');
+
+    // Actions
+    var legal = view.legal || [];
+    var over = view.phase === 'handEnd' || view.phase === 'matchEnd';
+    $('btnFold').disabled = !view.myTurn || legal.indexOf('fold') === -1;
+    var cc = $('btnCheckCall');
+    if (legal.indexOf('check') !== -1) { cc.textContent = 'Check'; cc.disabled = !view.myTurn; }
+    else if (legal.indexOf('call') !== -1) { cc.textContent = 'Call ' + view.toCall; cc.disabled = !view.myTurn; }
+    else { cc.textContent = 'Check'; cc.disabled = true; }
+    var canRaise = view.myTurn && legal.indexOf('raise') !== -1;
+    $('raiseBox').style.opacity = canRaise ? '1' : '.45';
+    $('btnRaise').disabled = !canRaise;
+    $('raiseSlider').disabled = !canRaise;
+    if (canRaise) {
+      var s = $('raiseSlider');
+      s.min = view.minRaiseTo; s.max = view.maxRaiseTo; s.step = 10;
+      if (parseInt(s.value, 10) < view.minRaiseTo || parseInt(s.value, 10) > view.maxRaiseTo) s.value = view.minRaiseTo;
+      $('raiseAmt').textContent = 'Raise to ' + s.value;
+      $('btnRaise').textContent = 'Raise to ' + s.value;
+    } else {
+      $('raiseAmt').textContent = '—';
+      $('btnRaise').textContent = 'Raise to …';
+    }
+    $('btnHalfPot').disabled = !canRaise;
+    $('btnPot').disabled = !canRaise;
+    $('btnAllIn').disabled = !canRaise;
+
+    // Banner + Next hand
+    var next = $('btnNext');
+    if (view.phase === 'matchEnd') {
+      var mw = (view.matchWinner !== null && view.matchWinner !== undefined) ? view.matchWinner : view.winner;
+      banner('🏆 Match over — ' + (mw === mySeat ? dispMeName() : dispOppName()) + ' takes the match! <small>Tap Rematch for a fresh 1,000 each.</small>');
+      next.textContent = 'Rematch'; next.disabled = false;
+    } else if (view.phase === 'handEnd') {
+      var msg;
+      if (view.winningReason === 'fold') msg = (view.winner === mySeat ? dispMeName() : dispOppName()) + ' wins ' + view.winningPot + ' — opponent folded.';
+      else if (view.winner === null) msg = 'Split pot, ' + view.winningPot + ' each way.';
+      else msg = (view.winner === mySeat ? dispMeName() : dispOppName()) + ' wins ' + view.winningPot + ' with ' + (view.showdown ? view.showdown.names[view.winner] : '') + '.';
+      banner(msg);
+      next.textContent = 'Next hand'; next.disabled = false;
+    } else {
+      banner(null); next.disabled = true;
+    }
+    if (mode === 'guest') next.disabled = (view.phase !== 'handEnd' && view.phase !== 'matchEnd');
+    renderTalk();
+  }
+  // Table talk: a persistent log, NOT the opponent bubble. The old code
+  // wrote taunts into the opponent bubble, and the next render() overwrote
+  // them with the last action — which is why the comment buttons looked
+  // like they did nothing. This log survives renders.
+  var talk = [];
+  function renderTalk() {
+    var el = $('talkLog');
+    if (!el) return;
+    if (!talk.length) return; // keep the placeholder until the first comment
+    el.innerHTML = talk.map(function (t) {
+      return '<div><b>' + esc(t.who) + ':</b> ' + esc(t.text) + '</div>';
+    }).join('');
+  }
+  function addTalk(who, text) {
+    talk.push({ who: who, text: text });
+    while (talk.length > 4) talk.shift();
+    renderTalk();
+  }
+
+  function refreshLocal() {
+    if (!game) return;
+    view = game.view(mySeat);
+    if (mode === 'pass' && view.phase !== 'handEnd' && view.phase !== 'matchEnd' && game.turn !== mySeat) {
+      // Pass-and-play: the phone now belongs to the other player.
+      // Do NOT render the new view yet — the cover hides the old one,
+      // and the new player's cards appear only after they tap Ready.
+      showPassCover(game.turn);
+      return;
+    }
+    render();
+    // Persist the record at every completed hand/match, not just at
+    // match end: a tab closed after a hand still keeps that hand.
+    // Pass mode saves from seat 0's perspective with fixed seat names,
+    // because the viewer (and myName/oppName as viewer/other) swaps
+    // every turn — saving by viewer would split one record into two.
+    if (view.phase === 'handEnd' || view.phase === 'matchEnd') {
+      if (mode === 'pass') saveRecord(passSeat0, passSeat1, 'two', view, 0);
+      else saveRecord(myName, oppName, mode === 'solo' ? 'solo' : 'two', view, mySeat);
+    }
+  }
+  function broadcast() {
+    if (conn && mode === 'host' && game) conn.send({ type: 'state', view: game.view(1), hostName: myName });
+  }
+  function doAction(action) {
+    if (!view || !view.myTurn) return;
+    if (mode === 'solo') {
+      var r = game.act(0, action);
+      if (!r.ok) { alert(r.error); return; }
+      refreshLocal();
+      scheduleBot();
+    } else if (mode === 'host') {
+      var r2 = game.act(0, action);
+      if (!r2.ok) { alert(r2.error); return; }
+      refreshLocal(); broadcast();
+    } else if (mode === 'pass') {
+      var r3 = game.act(mySeat, action);
+      if (!r3.ok) { alert(r3.error); return; }
+      refreshLocal();
+    } else if (mode === 'guest') {
+      conn.send({ type: 'action', action: action });
+      // Wait for the host's state; the buttons stay live but the host
+      // rejects anything out of turn, so a double-tap cannot double-bet.
+    }
+  }
+  function scheduleBot() {
+    clearTimeout(botTimer);
+    if (mode !== 'solo' || !game) return;
+    if (game.phase === 'handEnd' || game.phase === 'matchEnd') return;
+    if (game.turn !== 1) return;
+    botTimer = setTimeout(function () {
+      if (!game || game.turn !== 1) return;
+      var a = Poker.botAction(game, 1);
+      game.act(1, a);
+      refreshLocal();
+      scheduleBot();
+    }, 750);
+  }
+  function doNext() {
+    if (mode === 'solo' || mode === 'host' || mode === 'pass') {
+      var r;
+      if (view.phase === 'matchEnd') r = game.rematch();
+      else r = game.nextHand();
+      if (!r.ok) { alert(r.error || 'Cannot advance'); return; }
+      refreshLocal(); if (mode === 'host') broadcast();
+      scheduleBot();
+    } else if (mode === 'guest') {
+      conn.send({ type: 'next' });
+    }
+  }
+  function onRemote(msg) {
+    if (!msg) return;
+    if (msg.type === 'state') {
+      view = msg.view; render();
+      if (mode === 'guest') {
+        // First state: adopt the host's record, so a guest who later
+        // hosts starts from the shared record, not a stale one.
+        if (!guestRecordSynced) { saveRecord(myName, oppName, 'two', view, mySeat); guestRecordSynced = true; }
+        else if (view.phase === 'handEnd' || view.phase === 'matchEnd') saveRecord(myName, oppName, 'two', view, mySeat);
+      }
+    }
+    else if (msg.type === 'action' && mode === 'host' && game) {
+      var r = game.act(1, msg.action);
+      if (r.ok) { refreshLocal(); broadcast(); }
+    }
+    else if (msg.type === 'next' && mode === 'host' && game) {
+      if (view.phase === 'matchEnd') game.rematch(); else game.nextHand();
+      refreshLocal(); broadcast();
+    }
+    else if (msg.type === 'hello' && msg.name) { /* Remote name ignored on purpose: this phone shows only what was typed on this phone (see syncNames). */ render(); }
+    else if (msg.type === 'taunt' && msg.text) {
+      addTalk(oppName, msg.text);
+    }
+  }
+
+  // ---- Setup / mode switching ----
+  function setMode(m) {
+    mode = m;
+    $('onlinePanel').classList.toggle('hidden', m !== 'online');
+    $('localPanel').classList.toggle('hidden', m !== 'local');
+    $('btnStartSolo').classList.toggle('hidden', m !== 'solo' && m !== 'pass');
+    $('btnStartSolo').textContent = m === 'pass' ? 'Start pass-and-play game' : 'Start solo game';
+    $('modeHelp').textContent = m === 'solo'
+      ? 'Blinds 10/20 · Stacks 1,000.'
+      : m === 'pass'
+      ? 'One phone, passed back and forth. No network, no Wi-Fi, no Bluetooth — works with every radio off.'
+      : m === 'online'
+      ? 'Same room code on both phones. Both need internet.'
+      : 'Same hotspot or Wi-Fi on both phones. No internet needed.';
+    updateRecordBox();
+  }
+  $('myName').oninput = updateRecordBox;
+  $('oppNameInput').oninput = updateRecordBox;
+  $('btnResetRecord').onclick = function () {
+    var my = $('myName').value.trim() || 'You';
+    var opp = $('oppNameInput').value.trim() || 'Opponent';
+    var solo = mode === 'solo';
+    var dispOpp = solo ? 'Bot' : opp;
+    if (!confirm('Clear the saved record vs ' + dispOpp + '? This cannot be undone.')) return;
+    try { localStorage.removeItem(recordKey(my, opp, solo ? 'solo' : 'two')); } catch (e) {}
+    updateRecordBox();
+  };
+  $('btnSolo').onclick = function () { setMode('solo'); };
+  $('btnOnline').onclick = function () { setMode('online'); };
+  $('btnLocal').onclick = function () { setMode('local'); };
+  $('btnPass').onclick = function () { setMode('pass'); };
+  setMode('solo');
+
+  $('btnStartSolo').onclick = function () {
+    myName = $('myName').value.trim() || 'You';
+    oppName = $('oppNameInput').value.trim() || 'Opponent';
+    if (mode === 'pass') {
+      // Pass-and-play: seat 0 is the first name typed, seat 1 the
+      // second. The record key is seat0|seat1 (same as the two-phone
+      // record for this pair), seeded from seat 0's perspective.
+      passSeat0 = myName; passSeat1 = oppName;
+      mySeat = 0;
+      game = new Poker.Game(seedOptsFor(passSeat0, passSeat1, 'two', 0));
+      showTable(); setStatus('Pass & play — 1 phone', false); refreshLocal();
+      return;
+    }
+    mode = 'solo'; mySeat = 0;
+    game = new Poker.Game(seedOptsFor(myName, oppName, 'solo', 0));
+    showTable(); setStatus('Solo vs Bot', false); refreshLocal(); scheduleBot();
+  };
+  $('btnPassReady').onclick = function () {
+    if (passCoverTarget === null) return;
+    mySeat = passCoverTarget;
+    hidePassCover();
+    refreshLocal();
+  };
+
+  // ---- Actions ----
+  $('btnFold').onclick = function () { doAction({ type: 'fold' }); };
+  $('btnCheckCall').onclick = function () {
+    if (!view) return;
+    if ((view.legal || []).indexOf('check') !== -1) doAction({ type: 'check' });
+    else doAction({ type: 'call' });
+  };
+  $('raiseSlider').oninput = function () {
+    $('raiseAmt').textContent = 'Raise to ' + this.value;
+    $('btnRaise').textContent = 'Raise to ' + this.value;
+  };
+  $('btnRaise').onclick = function () { doAction({ type: 'raise', amount: parseInt($('raiseSlider').value, 10) }); };
+  $('btnHalfPot').onclick = function () {
+    if (!view) return;
+    var target = Math.min(view.maxRaiseTo, Math.max(view.minRaiseTo, view.currentBet + Math.floor(view.pot / 2)));
+    $('raiseSlider').value = target; $('raiseSlider').oninput();
+  };
+  $('btnPot').onclick = function () {
+    if (!view) return;
+    var target = Math.min(view.maxRaiseTo, Math.max(view.minRaiseTo, view.currentBet + view.pot));
+    $('raiseSlider').value = target; $('raiseSlider').oninput();
+  };
+  $('btnAllIn').onclick = function () {
+    if (!view) return;
+    $('raiseSlider').value = view.maxRaiseTo; $('raiseSlider').oninput();
+  };
+  $('btnNext').onclick = doNext;
+  $('keepFaceUp').onchange = render;
+  $('wakeBtn').onclick = function () {
+    wakeOn = !wakeOn;
+    if (!wakeOn && wakeLock) { try { wakeLock.release(); } catch (e) {} wakeLock = null; }
+    else if (wakeOn) requestWakeLock();
+    updateWakeBtn();
+  };
+  updateWakeBtn();
+  var peek = $('peekBtn');
+  peek.addEventListener('pointerdown', function (e) { e.preventDefault(); peeking = true; render(); });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) {
+    peek.addEventListener(ev, function () { peeking = false; render(); });
+  });
+  document.querySelectorAll('#tauntRow button').forEach(function (b) {
+    b.onclick = function () {
+      var text = b.getAttribute('data-taunt');
+      // Always show your own comment locally first — the old code only
+      // sent it to the other phone, so on your own phone nothing happened.
+      addTalk(dispMeName(), text);
+      if (conn) conn.send({ type: 'taunt', text: text });
+      else if (mode === 'solo') {
+        // Solo: the bot talks back, so the buttons feel alive in practice too.
+        var replies = ["Ha, we'll see.", 'Nice try.', 'I saw that coming.', 'Your move, champ.'];
+        setTimeout(function () {
+          addTalk(oppName, replies[Math.floor(Math.random() * replies.length)]);
+        }, 900);
+      }
+    };
+  });
+  function copyText(id) {
+    var el = $(id); el.select();
+    try { navigator.clipboard.writeText(el.value); } catch (e) { document.execCommand('copy'); }
+  }
+  $('btnCopyOffer').onclick = function () { copyText('offerOut'); };
+  $('btnCopyAnswer').onclick = function () { copyText('answerOut'); };
+
+  // ---- Online mode (PeerJS, loaded only if chosen) ----
+  // v1.2 lesson: the free PeerJS signalling server drops sockets ("Lost
+  // connection to server") and the old code turned that into one modal
+  // alert with no retry. Now: no modal alerts for connection problems,
+  // the peer reconnects to the server on disconnect, the guest retries
+  // the join 3 times, and each failure says which side actually failed
+  // (host not found vs. signalling server dropped) instead of one
+  // generic message. Local mode below needs no server at all.
+  function setOnlineStatus(text, dotClass) {
+    $('onlineStatus').textContent = text;
+    $('onlineDot').className = 'dot' + (dotClass ? ' ' + dotClass : '');
+  }
+  function loadPeerJS(cb) {
+    if (window.Peer) return cb();
+    var s = document.createElement('script');
+    s.src = 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
+    s.onload = cb;
+    s.onerror = function () { setOnlineStatus('Could not load PeerJS (no internet?). Use Local mode instead — it needs no library.', 'warn'); $('btnSwitchLocal').classList.remove('hidden'); };
+    document.head.appendChild(s);
+  }
+  $('btnSwitchLocal').onclick = function () { setMode('local'); };
+  function attachPeer(peer, onOpen) {
+    peer.on('open', function () { onOpen(); });
+    peer.on('disconnected', function () {
+      setOnlineStatus('Lost connection to the signalling server — reconnecting…', 'warn');
+      try { peer.reconnect(); } catch (e) {}
+    });
+    peer.on('connection', function (c) {
+      conn = { send: function (m) { try { c.send(m); } catch (e) {} } };
+      c.on('data', onRemote);
+      c.on('open', function () {
+        mySeat = 0; mode = 'host';
+        if (!game) game = new Poker.Game(seedOptsFor($('myName').value.trim() || 'You', $('oppNameInput').value.trim() || 'Opponent', 'two', 0));
+        myName = $('myName').value.trim() || 'You';
+        showTable(); setStatus('Connected — you host', true);
+        conn.send({ type: 'hello', name: myName });
+        refreshLocal(); broadcast();
+      });
+    });
+    peer.on('error', function (e) {
+      var t = (e && e.type) || '';
+      if (t === 'unavailable-id') setOnlineStatus('That room code is already in use in another tab. Close other Poker tabs on the host phone, or pick a new code.', 'warn');
+      else setOnlineStatus('Connection error: ' + (e && e.message ? e.message : e) + ' — tap Host again.', 'warn');
+    });
+  }
+  $('btnHostOnline').onclick = function () {
+    var code = ($('roomCode').value.trim() || 'SPAIN').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    $('roomCode').value = code;
+    setOnlineStatus('Creating room ' + code + '…', '');
+    loadPeerJS(function () {
+      var peer = new Peer('spain-poker-' + code);
+      attachPeer(peer, function () { setOnlineStatus('Room ' + code + ' open — waiting for the other phone to join. Keep this tab in the foreground.', 'warn'); });
+    });
+  };
+  $('btnJoinOnline').onclick = function () {
+    var code = ($('roomCode').value.trim() || 'SPAIN').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    $('roomCode').value = code;
+    $('btnSwitchLocal').classList.add('hidden');
+    setOnlineStatus('Joining room ' + code + '…', '');
+    loadPeerJS(function () {
+      var peer = new Peer();
+      var joined = false, attempt = 0, timer = null, hostNotFound = false;
+      function failFinal(reason) {
+        setOnlineStatus(reason + ' — try Local mode below, it needs no server.', 'warn');
+        $('btnSwitchLocal').classList.remove('hidden');
+      }
+      function tryConnect() {
+        if (joined) return;
+        attempt++;
+        setOnlineStatus('Joining room ' + code + '… (attempt ' + attempt + ' of 3)', '');
+        var c;
+        try { c = peer.connect('spain-poker-' + code, { reliable: true }); }
+        catch (e) { return scheduleRetry('Could not start the connection.'); }
+        conn = { send: function (m) { try { c.send(m); } catch (e) {} } };
+        c.on('data', onRemote);
+        timer = setTimeout(function () {
+          if (!joined) { try { c.close(); } catch (e) {} scheduleRetry('The host did not answer in time.'); }
+        }, 8000);
+        c.on('open', function () {
+          joined = true; clearTimeout(timer);
+          guestRecordSynced = false;
+          mySeat = 1; mode = 'guest';
+          myName = $('myName').value.trim() || 'Opponent';
+          oppName = $('oppNameInput').value.trim() || 'You';
+          showTable(); setStatus('Connected — joined game', true);
+          conn.send({ type: 'hello', name: myName });
+        });
+        c.on('close', function () { if (!joined) scheduleRetry('Connection closed before the game opened.'); });
+        c.on('error', function () { if (!joined) scheduleRetry('Connection failed.'); });
+      }
+      function scheduleRetry(reason) {
+        clearTimeout(timer);
+        if (joined || hostNotFound) return;
+        if (attempt < 3) setTimeout(tryConnect, 1500);
+        else failFinal(reason);
+      }
+      peer.on('open', tryConnect);
+      peer.on('disconnected', function () {
+        if (joined) return;
+        setOnlineStatus('Lost connection to the signalling server — reconnecting and retrying…', 'warn');
+        try { peer.reconnect(); } catch (e) {}
+        setTimeout(function () { if (!joined && !hostNotFound && attempt < 3) tryConnect(); }, 2000);
+      });
+      peer.on('error', function (e) {
+        if (joined) return;
+        var t = (e && e.type) || '';
+        if (t === 'peer-unavailable') {
+          // Host really is not registered (yet). Stop retrying the wrong
+          // thing and say so plainly, instead of blaming the server.
+          hostNotFound = true;
+          clearTimeout(timer);
+          setOnlineStatus('Host not found. Make sure the host tapped Host first and saw "Room ' + code + ' open" on his phone, and both phones use exactly ' + code + '.', 'warn');
+          $('btnSwitchLocal').classList.remove('hidden');
+        } else if (t === 'disconnected' || t === 'server-error' || t === 'socket-error' || t === 'network') {
+          scheduleRetry('Lost connection to the signalling server.');
+        } else {
+          scheduleRetry('Could not join (' + (e && e.message ? e.message : e) + ').');
+        }
+      });
+    });
+  };
+
+  // ---- Local mode (manual WebRTC, no library, no internet) ----
+  var localPC = null, localChannel = null;
+  function waitIce(pc, done) {
+    if (pc.iceGatheringState === 'complete') return done();
+    var t = setTimeout(done, 4000); // host candidates are usually instant on a hotspot
+    pc.onicecandidate = function (e) { if (!e.candidate) { clearTimeout(t); done(); } };
+  }
+  function attachLocalChannel(channel) {
+    localChannel = channel;
+    conn = { send: function (m) { try { channel.send(JSON.stringify(m)); } catch (e) {} } };
+    channel.onmessage = function (e) { try { onRemote(JSON.parse(e.data)); } catch (err) {} };
+  }
+  $('btnCreateOffer').onclick = function () {
+    myName = $('myName').value.trim() || 'You';
+    localPC = new RTCPeerConnection({ iceServers: [] }); // local candidates only: no internet needed
+    var channel = localPC.createDataChannel('game');
+    attachLocalChannel(channel);
+    channel.onopen = function () {
+      mySeat = 0; mode = 'host';
+      if (!game) game = new Poker.Game(seedOptsFor($('myName').value.trim() || 'You', $('oppNameInput').value.trim() || 'Opponent', 'two', 0));
+      showTable(); setStatus('Connected locally — you host', true);
+      conn.send({ type: 'hello', name: myName });
+      refreshLocal(); broadcast();
+      $('localStatus').textContent = 'Connected locally';
+      $('localDot').className = 'dot on';
+    };
+    localPC.createOffer().then(function (offer) { return localPC.setLocalDescription(offer); }).then(function () {
+      waitIce(localPC, function () { $('offerOut').value = btoa(JSON.stringify(localPC.localDescription)); });
+    }).catch(function (e) { alert('Could not create offer: ' + e.message); });
+  };
+  $('btnCreateAnswer').onclick = function () {
+    myName = $('myName').value.trim() || 'Opponent';
+    var offer;
+    try { offer = JSON.parse(atob($('offerIn').value.trim())); } catch (e) { alert('That offer code does not look right — paste the full code from the host.'); return; }
+    localPC = new RTCPeerConnection({ iceServers: [] });
+    localPC.ondatachannel = function (e) {
+      attachLocalChannel(e.channel);
+      e.channel.onopen = function () {
+        guestRecordSynced = false;
+        mySeat = 1; mode = 'guest';
+        showTable(); setStatus('Connected locally — joined game', true);
+        conn.send({ type: 'hello', name: myName });
+        $('localStatus').textContent = 'Connected locally';
+        $('localDot').className = 'dot on';
+      };
+    };
+    localPC.setRemoteDescription(offer).then(function () { return localPC.createAnswer(); })
+      .then(function (answer) { return localPC.setLocalDescription(answer); })
+      .then(function () { waitIce(localPC, function () { $('answerOut').value = btoa(JSON.stringify(localPC.localDescription)); }); })
+      .catch(function (e) { alert('Could not create answer: ' + e.message); });
+  };
+  $('btnFinishLocal').onclick = function () {
+    var answer;
+    try { answer = JSON.parse(atob($('answerIn').value.trim())); } catch (e) { alert('That answer code does not look right — paste the full code from the guest.'); return; }
+    if (!localPC) { alert('Create an offer first.'); return; }
+    localPC.setRemoteDescription(answer).catch(function (e) { alert('Could not finish connecting: ' + e.message); });
+  };
+})();
+</script>
+</body>
+</html>
