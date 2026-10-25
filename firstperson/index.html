@@ -54,10 +54,18 @@
      things to be clipped, never the actions themselves. */
   body.playing { overflow:hidden; }
   body.playing #app { height:100dvh; display:flex; flex-direction:column; }
-  body.playing #score { flex-shrink:0; margin-bottom:4px; padding:5px 10px; font-size:12px; white-space:nowrap; }
-  body.playing #score span { white-space:nowrap; }
+  body.playing #score { flex-shrink:0; margin-bottom:4px; padding:5px 10px; font-size:12px; }
   body.playing #fpNote, body.playing #version { display:none; }
-  body.playing #table { flex:1; min-height:0; height:calc(100dvh - 40px); overflow:hidden; padding:6px 10px 6px; justify-content:flex-start; gap:2px; }
+  /* fp4: scrolling is back, on purpose. fp3 clipped the table to the
+     viewport to force everything on screen, but the table was still
+     taller than the screen, so the decision buttons at the bottom
+     were clipped off and unreachable — worse than scrolling. Now
+     the page scrolls normally, so Fold/Check/Raise are always
+     reachable with a short scroll, and the taunts/talk/wake lines
+     below them are back too. */
+  body.playing { overflow:auto; }
+  body.playing #app { height:auto; display:block; }
+  body.playing #table { height:auto; min-height:0; overflow:visible; padding:6px 10px 10px; justify-content:flex-start; gap:2px; }
   body.playing .opp .avatar { width:36px; height:36px; font-size:18px; margin-bottom:1px; }
   body.playing .opp .stack, body.playing .me .stack { font-size:14px; }
   body.playing .board { margin:2px 0; }
@@ -71,11 +79,8 @@
   body.playing #actions button { padding:10px 12px; }
   body.playing #raiseBox { padding:6px; }
   body.playing .banner { margin:4px 0; padding:7px 10px; }
-  /* fp3: these sit BELOW the decision buttons, so on a short screen
-     they were the things pushing the buttons off the bottom. Hide
-     them in the first-person view only — taunts still work in the
-     main version, and nothing here is needed to make a decision. */
-  body.playing .taunts, body.playing .talklog, body.playing #fpConn, body.playing #wakeBtn { display:none !important; }
+  /* fp4: taunts/talk/conn/wake are back — with scrolling restored
+     they no longer block the buttons, they just sit below them. */
   .opp { transform:scale(.86); transform-origin:top center; }
   .board .cards { transform:perspective(600px) rotateX(28deg); transform-origin:center top; }
   .me { margin-top:18px; }
@@ -280,13 +285,13 @@
   </section>
 
   <p id="fpNote" class="small" style="text-align:center">Blinds 10/20 · Stack 1,000 · Play chips only.</p>
-  <p id="version" class="small" style="text-align:center; margin-top:14px">Across the Table · v1.5-fp3 (first-person test)</p>
+  <p id="version" class="small" style="text-align:center; margin-top:14px">Across the Table · v1.5-fp4 (first-person test)</p>
 </div>
 <script src="poker.js"></script>
 <script>
 (function () {
   'use strict';
-  var APP_VERSION = 'v1.5-fp3';
+  var APP_VERSION = 'v1.5-fp4';
   var $ = function (id) { return document.getElementById(id); };
   var mode = 'solo'; // 'solo' | 'host' | 'guest' | 'pass'
   var game = null;   // host / solo / pass Game instance
@@ -424,7 +429,10 @@
     $('connDot').className = 'dot' + (on ? ' on' : '');
   }
   // First-person chip stacks + motion (fp only; engine untouched).
-  var CHIP_COLORS = ['#b4232a', '#f2ede3', '#2456a6', '#1a1a1a', '#e8c46a'];
+  var CHIP_COLORS = ['#b4232a', '#2456a6', '#1a1a1a', '#e8c46a', '#1e7a34'];
+  // fp4: no white chips as a base colour. White is only the edge
+  // spots and the small centre — a white chip in the stack read as a
+  // blob, especially the top disc, and washed the whole pile out.
   function renderChips(elId, amount, perChip) {
     var el = $(elId); if (!el) return;
     var n = amount <= 0 ? 0 : Math.max(1, Math.min(10, Math.ceil(amount / perChip)));
