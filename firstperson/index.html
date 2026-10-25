@@ -106,7 +106,12 @@
     background:radial-gradient(ellipse at center, #fdfbf5 0 30%, rgba(0,0,0,0) 31%),
       conic-gradient(var(--chip) 0 20%, #fff 20% 30%, var(--chip) 30% 55%, #fff 55% 65%, var(--chip) 65% 85%, #fff 85% 100%); }
   .potstack .chip-top { width:60px; }
-  .chip-fly { position:absolute; z-index:10; width:52px; height:52px; border-radius:50%; border:2px solid #fff; box-shadow:0 6px 14px rgba(0,0,0,.65); transition:transform 1s ease-in-out, opacity 1s; pointer-events:none;
+  /* fp5: flying chips are a fixed overlay on the whole screen, not
+     children of the table. Inside the table they could be clipped,
+     covered by the felt overlays, or start off-screen when the page
+     was scrolled to the buttons — which is why the pot pulsed (the
+     fly code ran) but no chip was ever seen moving. */
+  .chip-fly { position:fixed; z-index:9999; width:64px; height:64px; border-radius:50%; border:2px solid #fff; box-shadow:0 8px 18px rgba(0,0,0,.7); transition:transform 1.4s ease-in-out, opacity 1.4s; pointer-events:none;
     background:radial-gradient(circle at center, #fdfbf5 0 32%, rgba(0,0,0,0) 33%),
       conic-gradient(var(--chip) 0 20%, #fff 20% 30%, var(--chip) 30% 55%, #fff 55% 65%, var(--chip) 65% 85%, #fff 85% 100%); }
   @keyframes potPulse { 0% { transform:scale(1); } 40% { transform:scale(1.18); } 100% { transform:scale(1); } }
@@ -285,13 +290,13 @@
   </section>
 
   <p id="fpNote" class="small" style="text-align:center">Blinds 10/20 · Stack 1,000 · Play chips only.</p>
-  <p id="version" class="small" style="text-align:center; margin-top:14px">Across the Table · v1.5-fp4 (first-person test)</p>
+  <p id="version" class="small" style="text-align:center; margin-top:14px">Across the Table · v1.5-fp5 (first-person test)</p>
 </div>
 <script src="poker.js"></script>
 <script>
 (function () {
   'use strict';
-  var APP_VERSION = 'v1.5-fp4';
+  var APP_VERSION = 'v1.5-fp5';
   var $ = function (id) { return document.getElementById(id); };
   var mode = 'solo'; // 'solo' | 'host' | 'guest' | 'pass'
   var game = null;   // host / solo / pass Game instance
@@ -443,37 +448,44 @@
   }
   var prevPot = null, prevFlyKey = null;
   function flyChip(fromId, toId, color) {
-    var from = $(fromId), to = $(toId), table = $('table');
-    if (!from || !to || !table) return;
-    var fr = from.getBoundingClientRect(), tr = to.getBoundingClientRect(), br = table.getBoundingClientRect();
+    var from = $(fromId), to = $(toId);
+    if (!from || !to) return;
+    var fr = from.getBoundingClientRect(), tr = to.getBoundingClientRect();
+    // Clamp to the visible viewport: if a stack is scrolled off-screen
+    // (e.g. you are looking at the buttons at the bottom), fly from/to
+    // the nearest screen edge instead of from nowhere.
+    function clampPt(r) {
+      var x = r.left + r.width / 2, y = r.top + r.height / 2;
+      if (x < 40) x = 60; if (x > window.innerWidth - 40) x = window.innerWidth - 60;
+      if (y < 40) y = 80; if (y > window.innerHeight - 40) y = window.innerHeight - 80;
+      return { x: x, y: y };
+    }
+    var s = clampPt(fr), e = clampPt(tr);
     var chip = document.createElement('div');
     chip.className = 'chip-fly';
     chip.style.setProperty('--chip', color || '#b4232a');
-    chip.style.left = (fr.left - br.left + fr.width / 2 - 26) + 'px';
-    chip.style.top = (fr.top - br.top) + 'px';
-    table.appendChild(chip);
-    // Two frames before moving, so the browser actually paints the
-    // chip at its start — otherwise the first frame is skipped and
-    // the chip just appears at the end (the fp1 "it just appears" bug).
-    requestAnimationFrame(function () {
-      requestAnimationFrame(function () {
-        chip.style.transform = 'translate(' + (tr.left - fr.left) + 'px,' + (tr.top - fr.top) + 'px) rotate(360deg) scale(1.1)';
-        chip.style.opacity = '0.25';
-      });
-    });
-    setTimeout(function () { if (chip.parentNode) chip.parentNode.removeChild(chip); }, 1150);
+    chip.style.left = (s.x - 32) + 'px';
+    chip.style.top = (s.y - 32) + 'px';
+    document.body.appendChild(chip);
+    // Force a paint at the start position before moving — without this
+    // the browser can skip straight to the end and the chip just
+    // appears (the fp1/fp4 "it just appears" bug, in a new form).
+    void chip.offsetWidth;
+    chip.style.transform = 'translate(' + (e.x - s.x) + 'px,' + (e.y - s.y) + 'px) rotate(360deg) scale(1.05)';
+    chip.style.opacity = '0.3';
+    setTimeout(function () { if (chip.parentNode) chip.parentNode.removeChild(chip); }, 1600);
   }
-  // fp2: fly 3 chips, staggered, over a full second each — one fast
-  // chip was easy to miss, three slow ones are not.
+  // fp5: 3 chips, staggered, 1.4s each, 64px — if these still cannot
+  // be seen, it is not speed or size, it is the overlay itself.
   function flyChips(fromId, toId, color) {
     for (var i = 0; i < 3; i++) {
       (function (delay) {
         setTimeout(function () { flyChip(fromId, toId, color); }, delay);
-      })(i * 180);
+      })(i * 220);
     }
     var pot = $('potChips');
     if (pot && toId === 'potChips') {
-      setTimeout(function () { pot.classList.add('pot-pulse'); setTimeout(function () { pot.classList.remove('pot-pulse'); }, 500); }, 1000);
+      setTimeout(function () { pot.classList.add('pot-pulse'); setTimeout(function () { pot.classList.remove('pot-pulse'); }, 500); }, 1400);
     }
   }
   function showTable() {
