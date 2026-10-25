@@ -54,23 +54,28 @@
      things to be clipped, never the actions themselves. */
   body.playing { overflow:hidden; }
   body.playing #app { height:100dvh; display:flex; flex-direction:column; }
-  body.playing #score { flex-shrink:0; margin-bottom:6px; padding:7px 10px; font-size:13px; }
+  body.playing #score { flex-shrink:0; margin-bottom:4px; padding:5px 10px; font-size:12px; white-space:nowrap; }
+  body.playing #score span { white-space:nowrap; }
   body.playing #fpNote, body.playing #version { display:none; }
-  body.playing #table { flex:1; min-height:0; height:calc(100dvh - 48px); overflow:hidden; padding:8px 10px 8px; }
-  body.playing .opp .avatar { width:44px; height:44px; font-size:20px; margin-bottom:2px; }
-  body.playing .board { margin:4px 0; }
+  body.playing #table { flex:1; min-height:0; height:calc(100dvh - 40px); overflow:hidden; padding:6px 10px 6px; justify-content:flex-start; gap:2px; }
+  body.playing .opp .avatar { width:36px; height:36px; font-size:18px; margin-bottom:1px; }
+  body.playing .opp .stack, body.playing .me .stack { font-size:14px; }
+  body.playing .board { margin:2px 0; }
   body.playing .board .cards { transform:perspective(600px) rotateX(38deg); }
-  body.playing .cards { margin:4px 0; }
-  body.playing .pcard.small { width:38px; height:54px; }
-  body.playing .pcard { width:52px; height:72px; }
-  body.playing .pcard.my { width:84px; height:118px; }
-  body.playing .me { margin-top:8px; }
-  body.playing #actions { margin-top:6px; gap:6px; }
-  body.playing #actions button { padding:11px 12px; }
-  body.playing #raiseBox { padding:8px; }
-  body.playing .taunts { margin-top:6px; }
-  body.playing .talklog { margin-top:6px; min-height:0; padding:7px 10px; }
-  body.playing .banner { margin:6px 0; padding:8px 10px; }
+  body.playing .cards { margin:3px 0; }
+  body.playing .pcard.small { width:34px; height:48px; }
+  body.playing .pcard { width:48px; height:66px; }
+  body.playing .pcard.my { width:78px; height:108px; }
+  body.playing .me { margin-top:4px; }
+  body.playing #actions { margin-top:4px; gap:6px; }
+  body.playing #actions button { padding:10px 12px; }
+  body.playing #raiseBox { padding:6px; }
+  body.playing .banner { margin:4px 0; padding:7px 10px; }
+  /* fp3: these sit BELOW the decision buttons, so on a short screen
+     they were the things pushing the buttons off the bottom. Hide
+     them in the first-person view only — taunts still work in the
+     main version, and nothing here is needed to make a decision. */
+  body.playing .taunts, body.playing .talklog, body.playing #fpConn, body.playing #wakeBtn { display:none !important; }
   .opp { transform:scale(.86); transform-origin:top center; }
   .board .cards { transform:perspective(600px) rotateX(28deg); transform-origin:center top; }
   .me { margin-top:18px; }
@@ -80,18 +85,22 @@
   .pcard.my { width:96px; height:134px; }
   .pcard.my .rank { font-size:30px; }
   .pcard.my .big { font-size:60px; }
-  /* Chip stacks (fp2 fix): round discs, not bars. Each chip is an
-     ellipse seen from slightly above — coloured rim with white edge
-     spots (conic gradient) and a white centre — stacked with a heavy
-     overlap, so the pile grows and shrinks with the amount. The old
-     version was a dashed rectangle, which is why it read as striped
-     bars instead of chips. */
-  .chipstack { display:flex; flex-direction:column-reverse; align-items:center; min-height:14px; margin:6px 0; }
-  .chip { width:58px; height:20px; border-radius:50%; margin-top:-13px; box-shadow:0 2px 3px rgba(0,0,0,.55), inset 0 2px 0 rgba(255,255,255,.4);
+  /* Chip stacks (fp3 fix): this is a 2D fake-3D trick, Wolfenstein
+     style — no true 3D needed, just overlap + shading. A real stack
+     shows only a thin edge of each chip below the top one, and a
+     round face on top. fp2 showed the full ellipse of every chip,
+     which is why it looked like discs lying down, spread out.
+     Now: thin pill edges (only 4px visible each) + one round top
+     disc, so it reads as a stack, not a row of discs. */
+  .chipstack { display:flex; flex-direction:column-reverse; align-items:center; min-height:14px; margin:4px 0; }
+  .chip { width:54px; height:13px; border-radius:6px; margin-top:-9px; box-shadow:0 1px 2px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.45), inset 0 -1px 0 rgba(0,0,0,.4);
+    background:linear-gradient(90deg, #fff 0 10%, var(--chip) 10% 24%, #fff 24% 32%, var(--chip) 32% 68%, #fff 68% 76%, var(--chip) 76% 90%, #fff 90% 100%); }
+  .chip:first-child { margin-top:0; }
+  .potstack .chip { width:60px; }
+  .chip-top { width:54px; height:24px; border-radius:50%; margin-top:-8px; border:2px solid rgba(255,255,255,.85); box-shadow:0 3px 6px rgba(0,0,0,.55);
     background:radial-gradient(ellipse at center, #fdfbf5 0 30%, rgba(0,0,0,0) 31%),
       conic-gradient(var(--chip) 0 20%, #fff 20% 30%, var(--chip) 30% 55%, #fff 55% 65%, var(--chip) 65% 85%, #fff 85% 100%); }
-  .chip:first-child { margin-top:0; }
-  .potstack .chip { width:64px; }
+  .potstack .chip-top { width:60px; }
   .chip-fly { position:absolute; z-index:10; width:52px; height:52px; border-radius:50%; border:2px solid #fff; box-shadow:0 6px 14px rgba(0,0,0,.65); transition:transform 1s ease-in-out, opacity 1s; pointer-events:none;
     background:radial-gradient(circle at center, #fdfbf5 0 32%, rgba(0,0,0,0) 33%),
       conic-gradient(var(--chip) 0 20%, #fff 20% 30%, var(--chip) 30% 55%, #fff 55% 65%, var(--chip) 65% 85%, #fff 85% 100%); }
@@ -266,18 +275,18 @@
       <button data-taunt="All in? Brave.">All in? Brave.</button>
     </div>
     <div class="talklog" id="talkLog"><span class="small">Table talk</span></div>
-    <p class="small" style="text-align:center; margin-top:10px"><span class="status"><span class="dot" id="connDot"></span><span id="connStatus">Solo game</span></span></p>
+    <p id="fpConn" class="small" style="text-align:center; margin-top:10px"><span class="status"><span class="dot" id="connDot"></span><span id="connStatus">Solo game</span></span></p>
     <button class="btn2 hidden" id="wakeBtn" style="width:100%; margin-top:8px">Keep screen awake: On</button>
   </section>
 
   <p id="fpNote" class="small" style="text-align:center">Blinds 10/20 · Stack 1,000 · Play chips only.</p>
-  <p id="version" class="small" style="text-align:center; margin-top:14px">Across the Table · v1.5-fp2 (first-person test)</p>
+  <p id="version" class="small" style="text-align:center; margin-top:14px">Across the Table · v1.5-fp3 (first-person test)</p>
 </div>
 <script src="poker.js"></script>
 <script>
 (function () {
   'use strict';
-  var APP_VERSION = 'v1.5-fp2';
+  var APP_VERSION = 'v1.5-fp3';
   var $ = function (id) { return document.getElementById(id); };
   var mode = 'solo'; // 'solo' | 'host' | 'guest' | 'pass'
   var game = null;   // host / solo / pass Game instance
@@ -421,6 +430,7 @@
     var n = amount <= 0 ? 0 : Math.max(1, Math.min(10, Math.ceil(amount / perChip)));
     var html = '';
     for (var i = 0; i < n; i++) html += '<div class="chip" style="--chip:' + CHIP_COLORS[i % CHIP_COLORS.length] + '"></div>';
+    if (n > 0) html += '<div class="chip-top" style="--chip:' + CHIP_COLORS[(n - 1) % CHIP_COLORS.length] + '"></div>';
     el.innerHTML = html;
   }
   var prevPot = null, prevFlyKey = null;
